@@ -1,0 +1,18 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:layout_marginTop="12dp" android:orientation="vertical"
+    android:background="@color/tone" android:padding="12dp" tools:ignore="Overdraw">
+
+    <Button android:id="@+id/review_issue_quote" style="@style/StudyTextButton"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:gravity="start|center_vertical" />
+    <TextView android:id="@+id/review_issue_detail" style="@style/StudyCaption"
+        android:layout_width="match_parent" android:layout_height="wrap_content" />
+    <TextView android:id="@+id/review_issue_suggestion" style="@style/StudyCaption"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="4dp" android:textColor="@color/ink" />
+    <TextView android:id="@+id/review_issue_candidates" style="@style/StudyCaption"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="4dp" android:visibility="gone" />
+</LinearLayout>

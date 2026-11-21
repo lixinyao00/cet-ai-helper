@@ -1,0 +1,16 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/analysis_fragment" android:layout_width="match_parent"
+    android:layout_height="wrap_content" android:orientation="vertical"
+    android:paddingTop="8dp" android:paddingBottom="8dp"
+    android:focusable="true" android:background="?android:attr/selectableItemBackground">
+
+    <TextView android:id="@+id/fragment_text" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:fontFamily="serif"
+        android:textSize="18sp" android:textColor="@color/ink" android:textDirection="ltr" />
+    <TextView android:id="@+id/fragment_role" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:layout_marginTop="2dp"
+        android:textSize="14sp" android:textColor="@color/accent" android:fontFamily="sans-serif-medium" />
+    <TextView android:id="@+id/fragment_explanation" style="@style/StudyCaption"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="2dp" />
+</LinearLayout>

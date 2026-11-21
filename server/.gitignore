@@ -1,0 +1,11 @@
+target/
+data/
+.env
+.env.*
+*.mv.db
+*.trace.db
+*.log
+.mvn/wrapper/maven-wrapper.jar.bak
+.idea/
+*.iml
+.DS_Store

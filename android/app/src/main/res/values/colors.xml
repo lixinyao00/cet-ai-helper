@@ -1,0 +1,11 @@
+<resources>
+    <color name="paper">#F5F4EE</color>
+    <color name="surface">#FFFEFA</color>
+    <color name="ink">#162B2F</color>
+    <color name="muted">#455D60</color>
+    <color name="accent">#075B53</color>
+    <color name="on_accent">#FFFFFF</color>
+    <color name="outline">#C9D8D2</color>
+    <color name="tone">#E3EEE8</color>
+    <color name="marker">#FADD80</color>
+</resources>

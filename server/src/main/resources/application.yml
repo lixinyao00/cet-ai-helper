@@ -1,0 +1,45 @@
+server:
+  port: 8080
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+    whitelabel:
+      enabled: false
+
+spring:
+  application:
+    name: cet-server
+  datasource:
+    # 本地默认使用文件型 H2，数据保存在 server/data/ 下，重启后账号与会话仍在。
+    url: jdbc:h2:file:./data/cet;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+    hikari:
+      maximum-pool-size: 5
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+  jackson:
+    default-property-inclusion: non_null
+    time-zone: UTC
+
+cet:
+  auth:
+    # 会话凭证有效期（ISO-8601 时长），默认 72 小时。
+    token-ttl: ${CET_TOKEN_TTL:PT72H}
+  explanation:
+    # demo：只返回内置示例释义，无需模型密钥；live：调用兼容 OpenAI Chat Completions 的服务。
+    mode: ${CET_EXPLANATION_MODE:demo}
+    base-url: ${CET_MODEL_BASE_URL:}
+    model: ${CET_MODEL_NAME:}
+    api-key: ${CET_MODEL_API_KEY:}
+    connect-timeout: ${CET_MODEL_CONNECT_TIMEOUT:PT3S}
+    read-timeout: ${CET_MODEL_READ_TIMEOUT:PT20S}
+
+logging:
+  level:
+    root: INFO
+    com.cethelper.server: INFO

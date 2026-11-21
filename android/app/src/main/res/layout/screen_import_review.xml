@@ -1,0 +1,48 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <ScrollView android:id="@+id/import_review_scroll"
+        android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:fillViewport="true">
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:padding="24dp" android:focusableInTouchMode="true">
+
+            <TextView style="@style/StudyHeading" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:text="@string/import_review" />
+            <TextView android:id="@+id/import_review_hint" style="@style/StudyCaption" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:text="@string/review_hint"
+                android:layout_marginTop="6dp" />
+
+            <EditText android:id="@+id/import_title" style="@style/StudyField"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="18dp" android:hint="@string/import_title"
+                android:inputType="textCapSentences" android:imeOptions="actionNext"
+                android:singleLine="true" android:maxLength="120" android:importantForAutofill="no" />
+
+            <EditText android:id="@+id/import_body" style="@style/StudyField"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="10dp" android:hint="@string/import_body"
+                android:gravity="top|start" android:inputType="textMultiLine|textCapSentences|textNoSuggestions"
+                android:paddingTop="14dp" android:paddingBottom="14dp"
+                android:minLines="7" android:maxLength="50000" android:importantForAutofill="no" />
+        </LinearLayout>
+    </ScrollView>
+
+    <TextView android:id="@+id/import_review_status" style="@style/StudyCaption"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginStart="24dp" android:layout_marginEnd="24dp"
+        android:accessibilityLiveRegion="polite" android:visibility="gone" />
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:paddingStart="24dp"
+        android:paddingEnd="24dp" android:paddingTop="8dp" android:paddingBottom="12dp">
+        <Button android:id="@+id/import_cancel" style="@style/StudyTextButton"
+            android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+            android:text="@string/cancel_import" />
+        <Button android:id="@+id/import_confirm" style="@style/StudyPrimaryButton"
+            android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+            android:text="@string/confirm_import" />
+    </LinearLayout>
+</LinearLayout>

@@ -1,0 +1,26 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:gravity="center_vertical" android:padding="24dp">
+
+        <TextView style="@style/StudyHeading" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:text="@string/importing" />
+        <ProgressBar android:id="@+id/import_progress" android:layout_width="28dp"
+            android:layout_height="28dp" android:layout_marginTop="16dp" />
+        <TextView android:id="@+id/import_message" style="@style/StudyCaption"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="10dp" android:accessibilityLiveRegion="polite" />
+        <Button android:id="@+id/import_recapture" style="@style/StudyPrimaryButton"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="16dp" android:text="@string/recapture"
+            android:visibility="gone" />
+        <Button android:id="@+id/import_reselect" style="@style/StudyTextButton"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="@string/reselect" android:visibility="gone" />
+        <Button android:id="@+id/import_cancel" style="@style/StudyTextButton"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" android:text="@string/cancel_import" />
+    </LinearLayout>
+</ScrollView>

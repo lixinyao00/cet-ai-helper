@@ -1,0 +1,47 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:gravity="center_vertical"
+        android:paddingStart="26dp" android:paddingEnd="26dp" android:paddingTop="28dp"
+        android:paddingBottom="28dp" android:focusableInTouchMode="true">
+
+        <TextView style="@style/StudyCaption" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:text="@string/app_name" />
+
+        <TextView style="@style/StudyHeading" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="6dp"
+            android:text="@string/login_title" />
+
+        <EditText android:id="@+id/username" style="@style/StudyField"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="24dp" android:hint="@string/username"
+            android:autofillHints="username" android:inputType="textVisiblePassword"
+            android:imeOptions="actionNext" android:singleLine="true" />
+
+        <EditText android:id="@+id/password" style="@style/StudyField"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="10dp" android:hint="@string/password"
+            android:autofillHints="password" android:inputType="textPassword"
+            android:imeOptions="actionDone" android:singleLine="true"
+            android:saveEnabled="false" />
+
+        <TextView android:id="@+id/login_status" style="@style/StudyCaption"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="12dp" android:accessibilityLiveRegion="polite"
+            android:visibility="gone" />
+
+        <Button android:id="@+id/login" style="@style/StudyPrimaryButton"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="16dp" android:text="@string/login" />
+
+        <Button android:id="@+id/register" style="@style/StudyTextButton"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="@string/register" />
+
+        <Button android:id="@+id/server_settings" style="@style/StudyTextButton"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="@string/server_settings" />
+    </LinearLayout>
+</ScrollView>

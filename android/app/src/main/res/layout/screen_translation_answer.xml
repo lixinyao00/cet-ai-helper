@@ -1,0 +1,90 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/translation_scroll" android:layout_width="match_parent"
+    android:layout_height="match_parent" android:fillViewport="true">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="24dp" android:focusableInTouchMode="true">
+
+        <Button android:id="@+id/translation_edit_source" style="@style/StudyTextButton"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="@string/translation_edit_source" />
+
+        <TextView style="@style/StudyHeading" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="8dp"
+            android:text="@string/translation_title" />
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="14dp" android:background="@drawable/card"
+            android:padding="16dp" android:orientation="vertical">
+            <TextView style="@style/StudyCaption" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:text="@string/translation_source" />
+            <TextView android:id="@+id/translation_original" style="@style/StudyCaption"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="6dp" android:textSize="17sp"
+                android:textColor="@color/ink" android:textIsSelectable="true" />
+        </LinearLayout>
+
+        <TextView style="@style/StudyCaption" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="18dp"
+            android:labelFor="@id/translation_draft" android:text="@string/translation_draft" />
+        <EditText android:id="@+id/translation_draft" style="@style/StudyField"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:paddingTop="14dp" android:paddingBottom="14dp" android:gravity="top|start"
+            android:inputType="textMultiLine|textCapSentences"
+            android:minLines="5" android:saveEnabled="false" android:importantForAutofill="no" />
+
+        <Button android:id="@+id/translation_submit" style="@style/StudyPrimaryButton"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="10dp" android:text="@string/translation_submit" />
+
+        <LinearLayout android:id="@+id/translation_review_panel"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="20dp" android:background="@drawable/card"
+            android:orientation="vertical" android:padding="16dp" android:visibility="gone">
+            <TextView android:id="@+id/translation_review_heading" style="@style/StudyHeading"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="@string/translation_review_heading" android:textSize="22sp" />
+            <TextView android:id="@+id/translation_review_status" style="@style/StudyCaption"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="6dp" android:accessibilityLiveRegion="polite" />
+            <TextView android:id="@+id/translation_edited" style="@style/StudyCaption"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="6dp" android:visibility="gone"
+                android:text="@string/translation_edited" />
+            <LinearLayout android:id="@+id/translation_issues" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:orientation="vertical" />
+            <Button android:id="@+id/translation_retry_review" style="@style/StudyTextButton"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="@string/retry" android:visibility="gone" />
+            <Button android:id="@+id/translation_edit_draft" style="@style/StudyTextButton"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="@string/translation_edit_draft" android:visibility="gone" />
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/translation_hint_panel"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="20dp" android:background="@drawable/card"
+            android:orientation="vertical" android:padding="12dp">
+            <TextView style="@style/StudyCaption" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:text="@string/translation_hint_prompt" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <Button android:id="@+id/translation_keywords" style="@style/StudyTextButton"
+                    android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+                    android:text="@string/translation_keywords" />
+                <Button android:id="@+id/translation_phrases" style="@style/StudyTextButton"
+                    android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+                    android:text="@string/translation_phrases" />
+                <Button android:id="@+id/translation_structure" style="@style/StudyTextButton"
+                    android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+                    android:text="@string/translation_structure" />
+            </LinearLayout>
+            <TextView android:id="@+id/translation_hint_status" style="@style/StudyCaption"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:accessibilityLiveRegion="polite" android:visibility="gone" />
+            <LinearLayout android:id="@+id/translation_hint_items" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:orientation="vertical" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

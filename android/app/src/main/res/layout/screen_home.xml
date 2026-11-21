@@ -1,0 +1,75 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="24dp">
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:gravity="center_vertical" android:orientation="horizontal">
+            <TextView android:id="@+id/current_student" style="@style/StudyCaption"
+                android:layout_width="0dp" android:layout_weight="1"
+                android:layout_height="wrap_content" />
+            <Button android:id="@+id/logout" style="@style/StudyTextButton"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="@string/logout" />
+        </LinearLayout>
+
+        <TextView style="@style/StudyHeading" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="10dp"
+            android:text="@string/app_name" />
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="24dp" android:background="@drawable/card"
+            android:orientation="vertical" android:padding="18dp">
+            <TextView style="@style/StudyCaption" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:text="@string/example_article" />
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="6dp" android:text="@string/article_title"
+                android:fontFamily="serif" android:textColor="@color/ink" android:textSize="25sp" />
+            <Button android:id="@+id/open_article" style="@style/StudyPrimaryButton"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="16dp" android:text="@string/open_article" />
+        </LinearLayout>
+
+        <Button android:id="@+id/open_vocabulary" style="@style/StudyTextButton"
+            android:background="@drawable/card" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="14dp"
+            android:text="@string/vocabulary" />
+
+        <Button android:id="@+id/open_translation" style="@style/StudyTextButton"
+            android:background="@drawable/card" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="8dp"
+            android:text="@string/translation_title" />
+
+        <Button android:id="@+id/open_writing" style="@style/StudyTextButton"
+            android:background="@drawable/card" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="8dp"
+            android:text="@string/writing_title" />
+
+        <TextView android:id="@+id/home_status" style="@style/StudyCaption"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="12dp" android:accessibilityLiveRegion="polite"
+            android:visibility="gone" />
+
+        <TextView style="@style/StudyHeading" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="24dp"
+            android:textSize="22sp" android:text="@string/my_articles" />
+
+        <Button android:id="@+id/capture_import" style="@style/StudyPrimaryButton"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="10dp" android:text="@string/capture_import" />
+        <Button android:id="@+id/pick_import" style="@style/StudyTextButton"
+            android:background="@drawable/card" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="8dp"
+            android:text="@string/pick_import" />
+
+        <TextView android:id="@+id/articles_status" style="@style/StudyCaption"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="12dp" android:accessibilityLiveRegion="polite" />
+        <Button android:id="@+id/articles_retry" style="@style/StudyTextButton"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="@string/retry" android:visibility="gone" />
+        <LinearLayout android:id="@+id/imported_articles" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:orientation="vertical" />
+    </LinearLayout>
+</ScrollView>

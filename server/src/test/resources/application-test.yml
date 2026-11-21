@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    # 测试使用独立的内存库，每个 Spring 上下文一个随机库名，避免用例之间互相干扰。
+    url: jdbc:h2:mem:test-${random.uuid};DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: create-drop
+
+cet:
+  auth:
+    token-ttl: PT1H
+  explanation:
+    mode: demo

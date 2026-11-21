@@ -1,0 +1,10 @@
+<Button xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/imported_article"
+    style="@style/StudyTextButton"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:background="@drawable/card"
+    android:gravity="start|center_vertical"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp" />

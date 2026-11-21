@@ -1,0 +1,30 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:paddingStart="20dp" android:paddingEnd="20dp">
+
+    <Button android:id="@+id/vocabulary_back" style="@style/StudyTextButton"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="@string/back" />
+    <TextView style="@style/StudyHeading" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:layout_marginTop="10dp"
+        android:text="@string/vocabulary" />
+    <TextView android:id="@+id/vocabulary_student" style="@style/StudyCaption"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="4dp" />
+
+    <Button android:id="@+id/cloze_start" style="@style/StudyPrimaryButton"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="14dp" android:enabled="false" android:text="@string/cloze_start" />
+
+    <TextView android:id="@+id/vocabulary_status" style="@style/StudyCaption"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="18dp" android:accessibilityLiveRegion="polite"
+        android:visibility="gone" />
+    <Button android:id="@+id/vocabulary_retry" style="@style/StudyTextButton"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="@string/retry" android:visibility="gone" />
+    <ListView android:id="@+id/vocabulary_list" android:layout_width="match_parent"
+        android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="12dp"
+        android:paddingBottom="12dp" android:clipToPadding="false"
+        android:divider="@android:color/transparent" android:dividerHeight="10dp" />
+</LinearLayout>

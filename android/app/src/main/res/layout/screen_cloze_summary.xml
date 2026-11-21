@@ -1,0 +1,18 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:gravity="center_vertical" android:padding="24dp">
+
+        <TextView style="@style/StudyHeading" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:text="@string/cloze_summary" />
+        <TextView android:id="@+id/cloze_score" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="14dp"
+            android:background="@drawable/card" android:padding="16dp" android:textSize="24sp"
+            android:fontFamily="sans-serif-medium" android:textColor="@color/ink" />
+        <Button android:id="@+id/cloze_summary_back" style="@style/StudyPrimaryButton"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="20dp" android:text="@string/cloze_back" />
+    </LinearLayout>
+</ScrollView>

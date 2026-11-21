@@ -1,0 +1,51 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="24dp" android:focusableInTouchMode="true">
+
+        <Button android:id="@+id/translation_back" style="@style/StudyTextButton"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="@string/back" />
+
+        <TextView style="@style/StudyHeading" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="8dp"
+            android:text="@string/translation_title" />
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="12dp" android:orientation="horizontal">
+            <Button android:id="@+id/translation_capture" style="@style/StudyTextButton"
+                android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+                android:text="@string/capture_import" />
+            <Button android:id="@+id/translation_pick" style="@style/StudyTextButton"
+                android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+                android:text="@string/pick_import" />
+        </LinearLayout>
+
+        <TextView style="@style/StudyCaption" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="10dp"
+            android:labelFor="@id/translation_source_input" android:text="@string/translation_source_label" />
+
+        <EditText android:id="@+id/translation_source_input" style="@style/StudyField"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:paddingTop="14dp" android:paddingBottom="14dp" android:gravity="top|start"
+            android:inputType="textMultiLine|textNoSuggestions"
+            android:minLines="5" android:saveEnabled="false" android:importantForAutofill="no" />
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button android:id="@+id/translation_demo" style="@style/StudyTextButton"
+                android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+                android:text="@string/translation_demo_source" />
+            <Button android:id="@+id/translation_clear" style="@style/StudyTextButton"
+                android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+                android:text="@string/clear_practice" />
+        </LinearLayout>
+
+        <Button android:id="@+id/translation_start" style="@style/StudyPrimaryButton"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" android:text="@string/translation_start" />
+    </LinearLayout>
+</ScrollView>

@@ -1,0 +1,78 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/writing_scroll" android:layout_width="match_parent"
+    android:layout_height="match_parent" android:fillViewport="true">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="24dp" android:focusableInTouchMode="true">
+
+        <Button android:id="@+id/writing_back" style="@style/StudyTextButton"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="@string/back" />
+
+        <TextView style="@style/StudyHeading" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="8dp"
+            android:text="@string/writing_title" />
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button android:id="@+id/writing_demo" style="@style/StudyTextButton"
+                android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+                android:text="@string/writing_demo" />
+            <Button android:id="@+id/writing_clear" style="@style/StudyTextButton"
+                android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+                android:text="@string/clear_practice" />
+        </LinearLayout>
+
+        <TextView style="@style/StudyCaption" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="12dp"
+            android:labelFor="@id/writing_prompt" android:text="@string/writing_prompt" />
+        <EditText android:id="@+id/writing_prompt" style="@style/StudyField"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="6dp" android:gravity="top|start" android:minLines="2"
+            android:paddingTop="14dp" android:paddingBottom="14dp"
+            android:inputType="textMultiLine|textCapSentences"
+            android:saveEnabled="false" android:importantForAutofill="no" />
+
+        <TextView style="@style/StudyCaption" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="18dp"
+            android:labelFor="@id/writing_essay" android:text="@string/writing_essay" />
+        <EditText android:id="@+id/writing_essay" style="@style/StudyField"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="6dp" android:gravity="top|start" android:minLines="8"
+            android:paddingTop="14dp" android:paddingBottom="14dp"
+            android:inputType="textMultiLine|textCapSentences"
+            android:saveEnabled="false" android:importantForAutofill="no" />
+
+        <Button android:id="@+id/writing_submit" style="@style/StudyPrimaryButton"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="10dp" android:text="@string/writing_submit" />
+
+        <TextView android:id="@+id/writing_request_status" style="@style/StudyCaption"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="10dp" android:visibility="gone" android:accessibilityLiveRegion="polite" />
+
+        <Button android:id="@+id/writing_retry" style="@style/StudyTextButton"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:visibility="gone" android:text="@string/retry" />
+
+        <LinearLayout android:id="@+id/writing_review_panel"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="20dp" android:background="@drawable/card"
+            android:orientation="vertical" android:padding="16dp" android:visibility="gone">
+            <TextView android:id="@+id/writing_review_heading" style="@style/StudyHeading"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:textSize="22sp" />
+            <TextView android:id="@+id/writing_review_overall" style="@style/StudyCaption"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="6dp" android:accessibilityLiveRegion="polite" />
+            <TextView android:id="@+id/writing_review_edited" style="@style/StudyCaption"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="6dp" android:text="@string/writing_review_edited" android:visibility="gone" />
+            <LinearLayout android:id="@+id/writing_issues" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:orientation="vertical" />
+            <Button android:id="@+id/writing_edit_essay" style="@style/StudyTextButton"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="@string/writing_edit_essay" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

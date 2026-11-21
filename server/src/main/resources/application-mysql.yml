@@ -1,0 +1,30 @@
+# 可选 MySQL 存储：仅当显式激活 mysql profile 时生效。
+#
+#   SPRING_PROFILES_ACTIVE=mysql \
+#   CET_DB_URL='jdbc:mysql://127.0.0.1:3306/<schema>?...' \
+#   CET_DB_USERNAME='<user>' CET_DB_PASSWORD='<password>' \
+#   java -jar target/cet-server-0.1.0.jar
+#
+# 默认（不激活 mysql）仍是文件型 H2 + ddl-auto=update，测试仍用内存 H2 + create-drop。
+# 建表由 DBA 在独立空 schema 中执行 db/mysql/schema.sql；服务端只做 JPA validate，
+# 不会自动建表、改表或清空数据。连接参数只从环境变量读取，不写默认主机与凭据。
+spring:
+  datasource:
+    url: ${CET_DB_URL}
+    username: ${CET_DB_USERNAME}
+    password: ${CET_DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 5
+      # MySQL DATETIME 不保存时区；把每个连接的会话时区固定为 UTC，
+      # 与 CET 的 Instant/UTC 语义及 Hibernate 的 jdbc.time_zone 保持一致。
+      connection-init-sql: "SET time_zone = '+00:00'"
+  jpa:
+    open-in-view: false
+    hibernate:
+      # 只用 schema.sql 建表；表/列缺失或类型不符时启动失败，避免自动改生产库结构。
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
