@@ -1,0 +1,22 @@
+<resources>
+    <color name="paper">#0F1719</color>
+    <color name="surface">#182427</color>
+    <color name="surface_elevated">#1E2D31</color>
+    <color name="ink">#E6F0EE</color>
+    <color name="muted">#9FB3B0</color>
+    <color name="accent">#4DB6AC</color>
+    <color name="accent_soft">#163330</color>
+    <color name="on_accent">#082421</color>
+    <color name="outline">#2A3B3F</color>
+    <color name="tone">#1C2B2F</color>
+    <color name="marker">#665214</color>
+    <color name="danger">#F28B82</color>
+    <color name="danger_soft">#3A1E1E</color>
+    <color name="warning">#FFB74D</color>
+    <color name="warning_soft">#362912</color>
+    <color name="success">#66BB9A</color>
+    <color name="success_soft">#153328</color>
+    <color name="badge_bg">#1D3A37</color>
+    <color name="badge_text">#80CBC4</color>
+    <color name="ripple">#334DB6AC</color>
+</resources>

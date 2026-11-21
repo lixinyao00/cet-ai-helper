@@ -192,6 +192,29 @@ class TranslationLiveApiTest {
     }
 
     @Test
+    @DisplayName("批改：模型返回评分与参考译文时透传，未返回时字段省略")
+    void optionalScoreFieldsArePassedThroughOrOmitted() throws Exception {
+        UPSTREAM.content("{\"overallFeedback\":\"意思准确、表达自然，可以提交。\",\"issues\":[],"
+                + "\"estimatedScore\":13,\"scoreMax\":15,"
+                + "\"scoreBand\":\"第一档（13-15分）：译文准确，表达流畅。\","
+                + "\"referenceTranslation\":\"As the digital economy develops rapidly, programming skills are "
+                + "becoming increasingly important for college graduates.\"}");
+
+        JsonNode scored = expectReview();
+        assertThat(scored.get("estimatedScore").asInt()).isEqualTo(13);
+        assertThat(scored.get("scoreMax").asInt()).isEqualTo(15);
+        assertThat(scored.get("scoreBand").asText()).contains("第一档");
+        assertThat(scored.get("referenceTranslation").asText()).contains("digital economy");
+
+        // 模型没给评分时字段省略，保证旧客户端与旧契约不受影响。
+        UPSTREAM.content(CLEAN_REVIEW_CONTENT);
+        JsonNode plain = expectReview();
+        assertThat(plain.has("estimatedScore")).isFalse();
+        assertThat(plain.has("scoreBand")).isFalse();
+        assertThat(plain.has("referenceTranslation")).isFalse();
+    }
+
+    @Test
     @DisplayName("批改：漏译引用中文原文、表达不自然引用学生译文，逐条透传")
     void reviewWithIssuesKeepsQuotesAndOrder() throws Exception {
         UPSTREAM.content(ISSUE_REVIEW_CONTENT);

@@ -41,10 +41,10 @@ final class DemoWritingCatalog {
                                     "把 organize 改成 organized。")),
                     new Exercise(0, "从括号内选出与主语一致的动词形式，并写下完整句子。",
                             "The volunteers at the animal shelter (feeds / feed) the dogs every morning."),
-                    "demo"),
+                    "demo", 10, 15, "第三档（10-12分）：基本切题，条理不够清晰，有较多语言错误，需要修改后再提交。"),
             new WritingReviewRequest(PROMPT, REVISION),
             new WritingReviewResponse(PROMPT, REVISION, "文章切题，清洁活动的细节说明了志愿服务为什么能锻炼协作和解决问题的能力。开头、事例和结尾衔接清楚。",
-                    List.of(), null, "demo"));
+                    List.of(), null, "demo", 14, 15, "第一档（13-15分）：切题，表达清楚，文字连贯，只有个别语言错误。"));
 
     private DemoWritingCatalog() {
     }

@@ -110,6 +110,26 @@ class WritingReviewLiveApiTest {
         assertThat(UPSTREAM.lastRequestBody()).doesNotContain(FAKE_API_KEY);
     }
 
+    @Test
+    void optionalScoreFieldsArePassedThroughOrOmitted() throws Exception {
+        String essay = "Bike lanes can make more people feel safe enough to cycle.";
+        UPSTREAM.content("{\"overallFeedback\":\"表达清楚，事例切题。\",\"issues\":[],\"estimatedScore\":12,"
+                + "\"scoreMax\":15,\"scoreBand\":\"第二档（10-12分）：切题，表达较清楚。\"}");
+
+        writingReview(mvc, token, PROMPT, essay)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estimatedScore").value(12))
+                .andExpect(jsonPath("$.scoreMax").value(15))
+                .andExpect(jsonPath("$.scoreBand").value(containsString("第二档")));
+
+        // 模型没给评分时字段省略，旧客户端不受影响。
+        UPSTREAM.content("{\"overallFeedback\":\"表达清楚，事例切题。\",\"issues\":[]}");
+        writingReview(mvc, token, PROMPT, essay)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estimatedScore").doesNotHaveJsonPath())
+                .andExpect(jsonPath("$.scoreBand").doesNotHaveJsonPath());
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"", ",\"exercise\":null"})
     void cleanEssayReturnsEmptyIssuesAndNoExercise(String optionalExercise) throws Exception {

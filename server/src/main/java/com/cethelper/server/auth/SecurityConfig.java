@@ -42,6 +42,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login").permitAll()
+                        // 健康检查用于客户端「测试连接」，必须在登录前匿名可用。
+                        .requestMatchers(HttpMethod.GET, "/api/v1/health").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/api/v1/**").authenticated()
                         .anyRequest().denyAll())

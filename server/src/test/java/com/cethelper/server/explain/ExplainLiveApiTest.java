@@ -83,7 +83,7 @@ class ExplainLiveApiTest {
     @BeforeEach
     void resetUpstreamAndCreateStudent() throws Exception {
         // 与用例执行顺序无关：每个用例开始都把假上游恢复为「正常返回、无延迟」。
-        UPSTREAM.mode(Mode.SUCCESS).slowMillis(0);
+        UPSTREAM.mode(Mode.SUCCESS).slowMillis(0).content(null);
         student = ApiTestSupport.newStudent(mockMvc);
     }
 
@@ -99,8 +99,8 @@ class ExplainLiveApiTest {
         JsonNode json = ApiTestSupport.body(result);
 
         assertThat(fieldNames(json))
-                .as("成功体必须恰好是契约约定的三个字段")
-                .containsExactlyInAnyOrder("meaning", "explanation", "mode");
+                .as("未返回可选字段时成功体只有契约约定字段与 contextual")
+                .containsExactlyInAnyOrder("meaning", "explanation", "mode", "contextual");
         assertThat(json.get("mode").asText()).as("live 模式下 mode 必须为 live").isEqualTo("live");
         assertThat(json.get("meaning").asText()).isEqualTo(UPSTREAM_MEANING);
         assertThat(json.get("explanation").asText()).isNotBlank();
@@ -115,6 +115,54 @@ class ExplainLiveApiTest {
         assertThat(UPSTREAM.lastAuthorization())
                 .as("密钥应通过 Authorization 头传给上游")
                 .isEqualTo("Bearer " + FAKE_API_KEY);
+    }
+
+    @Test
+    @DisplayName("上游返回音标/词性/原形时透传扩展字段，contextual=true；未返回时字段省略")
+    void extendedFieldsFromUpstreamArePassedThrough() throws Exception {
+        UPSTREAM.content("{\"meaning\":\"婉拒\",\"explanation\":\"这里作动词，指学生谢绝邀请。\","
+                + "\"phonetic\":\"/dɪˈklaɪn/\",\"partOfSpeech\":\"v.\",\"lemma\":\"decline\",\"cetLevel\":\"cet-4\"}");
+
+        JsonNode json = ApiTestSupport.body(ApiTestSupport
+                .explain(mockMvc, student.token(), "decline", ApiTestSupport.SENTENCE_DECLINE_VERB)
+                .andExpect(status().isOk())
+                .andReturn());
+
+        assertThat(fieldNames(json)).containsExactlyInAnyOrder("meaning", "explanation", "mode",
+                "phonetic", "partOfSpeech", "lemma", "cetLevel", "contextual");
+        assertThat(json.get("phonetic").asText()).isEqualTo("/dɪˈklaɪn/");
+        assertThat(json.get("partOfSpeech").asText()).isEqualTo("v.");
+        assertThat(json.get("lemma").asText()).isEqualTo("decline");
+        assertThat(json.get("cetLevel").asText()).as("cetLevel 统一规范为大写").isEqualTo("CET-4");
+        assertThat(json.get("contextual").asBoolean()).as("live 释义始终贴合原句语境").isTrue();
+    }
+
+    @Test
+    @DisplayName("上游只给 meaning/explanation 时，可选字段不出现在响应里（旧契约不变）")
+    void missingOptionalFieldsAreOmitted() throws Exception {
+        JsonNode json = ApiTestSupport.body(ApiTestSupport
+                .explain(mockMvc, student.token(), "decline", ApiTestSupport.SENTENCE_DECLINE_VERB)
+                .andExpect(status().isOk())
+                .andReturn());
+
+        assertThat(fieldNames(json)).containsExactlyInAnyOrder("meaning", "explanation", "mode", "contextual");
+        assertThat(json.has("phonetic")).isFalse();
+        assertThat(json.has("partOfSpeech")).isFalse();
+        assertThat(json.has("lemma")).isFalse();
+        assertThat(json.has("cetLevel")).isFalse();
+    }
+
+    @Test
+    @DisplayName("健康检查在 live 模式下返回 mode=live，且无需凭证")
+    void healthReportsLiveMode() throws Exception {
+        JsonNode json = ApiTestSupport.body(ApiTestSupport.health(mockMvc, null)
+                .andExpect(status().isOk())
+                .andReturn());
+
+        assertThat(fieldNames(json)).containsExactlyInAnyOrder("status", "mode", "version");
+        assertThat(json.get("status").asText()).isEqualTo("UP");
+        assertThat(json.get("mode").asText()).isEqualTo("live");
+        assertThat(json.get("version").asText()).isEqualTo("0.2.0");
     }
 
     @Test

@@ -29,4 +29,26 @@ interface FavoriteDao {
             + "WHERE favorites.serverUrl = :serverUrl AND favorites.studentId = :studentId "
             + "ORDER BY favorites.savedAt DESC, favorites.articleId, favorites.startOffset, favorites.endOffset")
     List<Row> list(String serverUrl, long studentId);
+
+    @Query("SELECT * FROM favorites WHERE serverUrl = :serverUrl AND studentId = :studentId "
+            + "AND articleId = :articleId ORDER BY startOffset ASC")
+    List<Favorite> listForArticle(String serverUrl, long studentId, String articleId);
+
+    @Query("DELETE FROM favorites WHERE serverUrl = :serverUrl AND studentId = :studentId "
+            + "AND articleId = :articleId AND startOffset = :startOffset AND endOffset = :endOffset")
+    void delete(String serverUrl, long studentId, String articleId, int startOffset, int endOffset);
+
+    @Query("UPDATE favorites SET mastery_level = :masteryLevel, review_count = review_count + 1, "
+            + "last_reviewed_at = :reviewedAt, next_review_at = :nextReviewAt "
+            + "WHERE serverUrl = :serverUrl AND studentId = :studentId "
+            + "AND articleId = :articleId AND startOffset = :startOffset AND endOffset = :endOffset")
+    void recordReview(String serverUrl, long studentId, String articleId, int startOffset, int endOffset,
+                      int masteryLevel, long reviewedAt, long nextReviewAt);
+
+    @Query("SELECT COUNT(*) FROM favorites WHERE serverUrl = :serverUrl AND studentId = :studentId")
+    int countAll(String serverUrl, long studentId);
+
+    @Query("SELECT COUNT(*) FROM favorites WHERE serverUrl = :serverUrl AND studentId = :studentId "
+            + "AND next_review_at <= :now")
+    int countDue(String serverUrl, long studentId, long now);
 }

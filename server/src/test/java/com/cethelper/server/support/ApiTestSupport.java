@@ -89,6 +89,15 @@ public final class ApiTestSupport {
         return mvc.perform(request);
     }
 
+    /** 健康检查：用于验证匿名可访问与模式探测。 */
+    public static ResultActions health(MockMvc mvc, String token) throws Exception {
+        var request = get("/api/v1/health");
+        if (token != null) {
+            request = request.header("Authorization", "Bearer " + token);
+        }
+        return mvc.perform(request);
+    }
+
     public static ResultActions logout(MockMvc mvc, String token) throws Exception {
         var request = post("/api/v1/auth/logout");
         if (token != null) {

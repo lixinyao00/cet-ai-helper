@@ -1,75 +1,356 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="match_parent">
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
 
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="vertical" android:padding="24dp">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="20dp"
+        android:paddingTop="16dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="28dp">
 
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:gravity="center_vertical" android:orientation="horizontal">
-            <TextView android:id="@+id/current_student" style="@style/StudyCaption"
-                android:layout_width="0dp" android:layout_weight="1"
-                android:layout_height="wrap_content" />
-            <Button android:id="@+id/logout" style="@style/StudyTextButton"
-                android:layout_width="wrap_content" android:layout_height="wrap_content"
+        <!-- Top Header: App Title + Account Pill + Server Settings / Logout -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/StudyHeading"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/app_name"
+                    android:textSize="24sp" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/current_student"
+                        style="@style/StudyBadge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+
+                    <TextView
+                        android:id="@+id/home_connection_badge"
+                        style="@style/StudyCaption"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:background="@drawable/pill"
+                        android:paddingStart="8dp"
+                        android:paddingTop="3dp"
+                        android:paddingEnd="8dp"
+                        android:paddingBottom="3dp"
+                        android:textSize="11sp"
+                        android:visibility="gone" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/home_server_settings"
+                style="@style/StudyTextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="0dp"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:text="@string/server_settings"
+                android:textSize="12sp"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/logout"
+                style="@style/StudyTextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="0dp"
+                android:paddingStart="10dp"
+                android:paddingEnd="6dp"
                 android:text="@string/logout" />
         </LinearLayout>
 
-        <TextView style="@style/StudyHeading" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:layout_marginTop="10dp"
-            android:text="@string/app_name" />
+        <!-- Learning Dashboard Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/stat_card"
+            android:orientation="vertical"
+            android:padding="16dp">
 
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="24dp" android:background="@drawable/card"
-            android:orientation="vertical" android:padding="18dp">
-            <TextView style="@style/StudyCaption" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:text="@string/example_article" />
-            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:layout_marginTop="6dp" android:text="@string/article_title"
-                android:fontFamily="serif" android:textColor="@color/ink" android:textSize="25sp" />
-            <Button android:id="@+id/open_article" style="@style/StudyPrimaryButton"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:layout_marginTop="16dp" android:text="@string/open_article" />
+            <TextView
+                style="@style/StudyCaption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:text="@string/home_dashboard_title"
+                android:textColor="@color/accent"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:baselineAligned="false"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/home_stat_due_count"
+                        style="@style/StudyStatValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0" />
+
+                    <TextView
+                        style="@style/StudyStatLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/home_stat_due" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="36dp"
+                    android:layout_gravity="center_vertical"
+                    android:background="@color/outline" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/home_stat_total_vocab"
+                        style="@style/StudyStatValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0" />
+
+                    <TextView
+                        style="@style/StudyStatLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/home_stat_vocab" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="36dp"
+                    android:layout_gravity="center_vertical"
+                    android:background="@color/outline" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/home_stat_articles_count"
+                        style="@style/StudyStatValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0" />
+
+                    <TextView
+                        style="@style/StudyStatLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/home_stat_articles" />
+                </LinearLayout>
+            </LinearLayout>
         </LinearLayout>
 
-        <Button android:id="@+id/open_vocabulary" style="@style/StudyTextButton"
-            android:background="@drawable/card" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:layout_marginTop="14dp"
-            android:text="@string/vocabulary" />
+        <!-- Quick Actions 2x2 Grid + Vocabulary Banner -->
+        <TextView
+            style="@style/StudySectionTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="@string/home_quick_actions" />
 
-        <Button android:id="@+id/open_translation" style="@style/StudyTextButton"
-            android:background="@drawable/card" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:layout_marginTop="8dp"
-            android:text="@string/translation_title" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal">
 
-        <Button android:id="@+id/open_writing" style="@style/StudyTextButton"
-            android:background="@drawable/card" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:layout_marginTop="8dp"
-            android:text="@string/writing_title" />
+            <Button
+                android:id="@+id/capture_import"
+                style="@style/StudySecondaryButton"
+                android:layout_width="0dp"
+                android:layout_height="84dp"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:drawableTop="@drawable/ic_camera"
+                android:drawablePadding="6dp"
+                android:gravity="center"
+                android:paddingTop="14dp"
+                android:paddingBottom="12dp"
+                android:text="@string/capture_import" />
 
-        <TextView android:id="@+id/home_status" style="@style/StudyCaption"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="12dp" android:accessibilityLiveRegion="polite"
+            <Button
+                android:id="@+id/pick_import"
+                style="@style/StudySecondaryButton"
+                android:layout_width="0dp"
+                android:layout_height="84dp"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:drawableTop="@drawable/ic_gallery"
+                android:drawablePadding="6dp"
+                android:gravity="center"
+                android:paddingTop="14dp"
+                android:paddingBottom="12dp"
+                android:text="@string/pick_import" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/open_translation"
+                style="@style/StudySecondaryButton"
+                android:layout_width="0dp"
+                android:layout_height="84dp"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:drawableTop="@drawable/ic_translate"
+                android:drawablePadding="6dp"
+                android:gravity="center"
+                android:paddingTop="14dp"
+                android:paddingBottom="12dp"
+                android:text="@string/translation_title" />
+
+            <Button
+                android:id="@+id/open_writing"
+                style="@style/StudySecondaryButton"
+                android:layout_width="0dp"
+                android:layout_height="84dp"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:drawableTop="@drawable/ic_edit"
+                android:drawablePadding="6dp"
+                android:gravity="center"
+                android:paddingTop="14dp"
+                android:paddingBottom="12dp"
+                android:text="@string/writing_title" />
+        </LinearLayout>
+
+        <!-- Prominent Vocabulary Review Banner -->
+        <Button
+            android:id="@+id/open_vocabulary"
+            style="@style/StudyPrimaryButton"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginTop="12dp"
+            android:drawableStart="@drawable/ic_book"
+            android:drawablePadding="10dp"
+            android:drawableTint="@color/on_accent"
+            android:gravity="center"
+            android:text="@string/vocabulary"
+            android:textSize="16sp" />
+
+        <!-- Featured Demo Reading Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:background="@drawable/card"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                style="@style/StudyBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/example_article" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:fontFamily="serif"
+                android:text="@string/article_title"
+                android:textColor="@color/ink"
+                android:textSize="22sp" />
+
+            <Button
+                android:id="@+id/open_article"
+                style="@style/StudySecondaryButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/open_article" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/home_status"
+            style="@style/StudyCaption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:accessibilityLiveRegion="polite"
             android:visibility="gone" />
 
-        <TextView style="@style/StudyHeading" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:layout_marginTop="24dp"
-            android:textSize="22sp" android:text="@string/my_articles" />
+        <!-- Bookshelf / Imported Articles Section -->
+        <TextView
+            style="@style/StudySectionTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:text="@string/my_articles" />
 
-        <Button android:id="@+id/capture_import" style="@style/StudyPrimaryButton"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="10dp" android:text="@string/capture_import" />
-        <Button android:id="@+id/pick_import" style="@style/StudyTextButton"
-            android:background="@drawable/card" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:layout_marginTop="8dp"
-            android:text="@string/pick_import" />
+        <TextView
+            android:id="@+id/articles_status"
+            style="@style/StudyCaption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:accessibilityLiveRegion="polite" />
 
-        <TextView android:id="@+id/articles_status" style="@style/StudyCaption"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="12dp" android:accessibilityLiveRegion="polite" />
-        <Button android:id="@+id/articles_retry" style="@style/StudyTextButton"
-            android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="@string/retry" android:visibility="gone" />
-        <LinearLayout android:id="@+id/imported_articles" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:orientation="vertical" />
+        <Button
+            android:id="@+id/articles_retry"
+            style="@style/StudyTextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/retry"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/imported_articles"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="vertical" />
     </LinearLayout>
 </ScrollView>

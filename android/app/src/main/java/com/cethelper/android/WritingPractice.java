@@ -1,6 +1,7 @@
 package com.cethelper.android;
 
 import java.util.concurrent.ExecutorService;
+import java.util.function.Consumer;
 
 final class WritingPractice {
     static final int MAX_PROMPT = 2000;
@@ -17,10 +18,12 @@ final class WritingPractice {
 
     record Submission(String prompt, String essay) {}
 
+    private final ExecutorService executor;
     private final ApiClient api;
     private final String token;
-    private final ArticleOwner owner;
+    final ArticleOwner owner;
     private final DraftStore drafts;
+    private final Consumer<PracticeRecord> onRecordSaved;
     final PracticeRequest<WritingFeedback> request;
     String prompt;
     String essay;
@@ -30,27 +33,62 @@ final class WritingPractice {
     Runnable onChanged;
 
     WritingPractice(ExecutorService executor, ArticleOwner owner, String token, DraftStore drafts) {
-        api = new ApiClient(owner.serverUrl());
+        this(executor, owner, token, drafts, null);
+    }
+
+    WritingPractice(ExecutorService executor, ArticleOwner owner, String token, DraftStore drafts,
+                    Consumer<PracticeRecord> onRecordSaved) {
+        this.executor = executor;
+        this.api = new ApiClient(owner.serverUrl());
         this.token = token;
         this.owner = owner;
         this.drafts = drafts;
+        this.onRecordSaved = onRecordSaved;
         DraftStore.Writing saved = drafts.writing(owner);
         prompt = saved.prompt();
         essay = saved.essay();
         request = new PracticeRequest<>(executor, completed -> {
             if (completed.value != null) {
-                clearFollowUp();
-                feedback = completed.value;
-                WritingFeedback.Exercise exercise = feedback.exercise();
-                if (exercise != null) {
-                    WritingFollowUp.Context context = new WritingFollowUp.Context(
-                            feedback.issues().get(exercise.issueIndex()),
-                            new WritingFollowUp.Task(exercise.instruction(), exercise.item()));
-                    followUp = new WritingFollowUp(executor, api, token, context, this::notifyChanged);
+                applyFeedback(completed.value);
+                if (this.onRecordSaved != null && completed.value.rawJson() != null
+                        && !completed.value.rawJson().isEmpty()) {
+                    this.onRecordSaved.accept(new PracticeRecord(
+                            PracticeRecord.ownerKey(owner),
+                            PracticeRecord.TYPE_WRITING,
+                            completed.value.prompt(),
+                            completed.value.essay(),
+                            completed.value.rawJson(),
+                            completed.value.estimatedScore(),
+                            System.currentTimeMillis()));
                 }
             }
             notifyChanged();
         });
+    }
+
+    private void applyFeedback(WritingFeedback result) {
+        clearFollowUp();
+        feedback = result;
+        WritingFeedback.Exercise exercise = feedback.exercise();
+        if (exercise != null && exercise.issueIndex() >= 0 && exercise.issueIndex() < feedback.issues().size()) {
+            WritingFollowUp.Context context = new WritingFollowUp.Context(
+                    feedback.issues().get(exercise.issueIndex()),
+                    new WritingFollowUp.Task(exercise.instruction(), exercise.item()));
+            followUp = new WritingFollowUp(executor, api, token, context, this::notifyChanged);
+        }
+    }
+
+    void restoreFromRecord(String savedPrompt, String savedEssay, WritingFeedback savedFeedback) {
+        cancel();
+        prompt = savedPrompt;
+        essay = savedEssay;
+        latestSubmission = new Submission(ReadingArticle.trimSpace(savedPrompt), ReadingArticle.trimSpace(savedEssay));
+        if (savedFeedback != null) {
+            applyFeedback(savedFeedback);
+        } else {
+            feedback = null;
+        }
+        drafts.saveWriting(owner, prompt, essay, true);
     }
 
     private void notifyChanged() {
@@ -77,12 +115,12 @@ final class WritingPractice {
 
     void setPrompt(String input) {
         prompt = input;
-        saveInputs();
+        saveInputs(false);
     }
 
     void setEssay(String input) {
         essay = input;
-        saveInputs();
+        saveInputs(false);
     }
 
     void replace(String newPrompt, String newEssay) {
@@ -91,11 +129,11 @@ final class WritingPractice {
         latestSubmission = null;
         prompt = newPrompt;
         essay = newEssay;
-        saveInputs();
+        saveInputs(true);
     }
 
-    private void saveInputs() {
-        drafts.saveWriting(owner, prompt, essay);
+    private void saveInputs(boolean immediate) {
+        drafts.saveWriting(owner, prompt, essay, immediate);
     }
 
     Submission submission() {
@@ -103,6 +141,7 @@ final class WritingPractice {
     }
 
     void submit(Submission input) {
+        drafts.flush();
         latestSubmission = input;
         request.start(() -> api.writingReview(token, input.prompt(), input.essay()));
     }

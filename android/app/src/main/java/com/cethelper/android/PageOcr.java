@@ -35,7 +35,7 @@ final class PageOcr {
         app.images.execute(() -> {
             TextRecognizer recognizer = null;
             try {
-                Bitmap bitmap = decode(app.getContentResolver(), image);
+                Bitmap bitmap = decode(app.getContentResolver(), image, MAX_IMAGE_EDGE);
                 recognizer = TextRecognition.getClient(chinese
                         ? new ChineseTextRecognizerOptions.Builder().build()
                         : TextRecognizerOptions.DEFAULT_OPTIONS);
@@ -52,6 +52,10 @@ final class PageOcr {
                 main.post(() -> result.onResult(null));
             }
         });
+    }
+
+    static Bitmap decodePreview(ContentResolver resolver, Uri uri, int maxEdge) throws IOException {
+        return decode(resolver, uri, maxEdge);
     }
 
     private static String paragraphs(Text result, boolean chinese) {
@@ -96,7 +100,7 @@ final class PageOcr {
                 && Math.abs(above.left - below.left) <= lineHeight * 0.8f;
     }
 
-    private static Bitmap decode(ContentResolver resolver, Uri uri) throws IOException {
+    private static Bitmap decode(ContentResolver resolver, Uri uri, int maxEdge) throws IOException {
         if (Build.VERSION.SDK_INT >= 28) {
             return ImageDecoder.decodeBitmap(ImageDecoder.createSource(resolver, uri),
                     (decoder, info, source) -> {
@@ -104,17 +108,17 @@ final class PageOcr {
                         int width = info.getSize().getWidth();
                         int height = info.getSize().getHeight();
                         int longest = Math.max(width, height);
-                        if (longest > MAX_IMAGE_EDGE) {
-                            float scale = (float) MAX_IMAGE_EDGE / longest;
+                        if (longest > maxEdge) {
+                            float scale = (float) maxEdge / longest;
                             decoder.setTargetSize(Math.max(1, Math.round(width * scale)),
                                     Math.max(1, Math.round(height * scale)));
                         }
                     });
         }
-        return decodeLegacy(resolver, uri);
+        return decodeLegacy(resolver, uri, maxEdge);
     }
 
-    private static Bitmap decodeLegacy(ContentResolver resolver, Uri uri) throws IOException {
+    private static Bitmap decodeLegacy(ContentResolver resolver, Uri uri, int maxEdge) throws IOException {
         BitmapFactory.Options options = new BitmapFactory.Options();
         options.inJustDecodeBounds = true;
         try (InputStream stream = open(resolver, uri)) {
@@ -123,7 +127,7 @@ final class PageOcr {
         options.inJustDecodeBounds = false;
         options.inSampleSize = 1;
         int longest = Math.max(options.outWidth, options.outHeight);
-        while (longest / options.inSampleSize > MAX_IMAGE_EDGE) {
+        while (longest / options.inSampleSize > maxEdge) {
             options.inSampleSize *= 2;
         }
         Bitmap bitmap;

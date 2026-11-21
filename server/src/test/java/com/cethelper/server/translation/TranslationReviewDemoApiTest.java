@@ -68,10 +68,15 @@ class TranslationReviewDemoApiTest {
         JsonNode json = expectReview(DemoTranslationCatalog.DRAFT_TRANSLATION);
 
         assertThat(fieldNames(json))
-                .as("批改响应必须恰好是约定的五个字段")
-                .containsExactlyInAnyOrder("sourceText", "studentTranslation", "overallFeedback", "issues", "mode");
+                .as("批改响应必须恰好是约定的字段")
+                .containsExactlyInAnyOrder("sourceText", "studentTranslation", "overallFeedback", "issues", "mode",
+                        "estimatedScore", "scoreMax", "scoreBand", "referenceTranslation");
         assertThat(json.get("mode").asText()).isEqualTo("demo");
         assertThat(json.get("overallFeedback").asText()).isNotBlank();
+        assertThat(json.get("scoreMax").asInt()).as("四六级汉译英为 15 分制").isEqualTo(15);
+        assertThat(json.get("estimatedScore").asInt()).as("草稿含漏译与不地道搭配，落在第四档").isBetween(7, 9);
+        assertThat(json.get("scoreBand").asText()).contains("档").contains("分");
+        assertThat(json.get("referenceTranslation").asText()).isNotBlank();
 
         List<JsonNode> issues = items(json, "issues");
         assertThat(issues).as("草稿应返回 3 条问题：2 条漏译 + 1 条不地道搭配").hasSize(3);
@@ -104,6 +109,32 @@ class TranslationReviewDemoApiTest {
         String unnaturalQuote = issues.get(2).get("quote").asText();
         assertThat(SOURCE).as("UNNATURAL 的引用不应是中文原文片段").doesNotContain(unnaturalQuote);
         assertThat(DemoTranslationCatalog.DRAFT_TRANSLATION).contains(unnaturalQuote);
+    }
+
+    @Test
+    @DisplayName("内置样例的预估分随译文质量递增，档位与参考译文一并返回")
+    void demoReviewsCarryScoresAndReferenceTranslation() throws Exception {
+        JsonNode draft = expectReview(DemoTranslationCatalog.DRAFT_TRANSLATION);
+        JsonNode completed = expectReview(DemoTranslationCatalog.COMPLETED_TRANSLATION);
+        JsonNode accurate = expectReview(DemoTranslationCatalog.ACCURATE_TRANSLATION);
+
+        assertThat(draft.get("estimatedScore").asInt()).isEqualTo(9);
+        assertThat(completed.get("estimatedScore").asInt()).isEqualTo(12);
+        assertThat(accurate.get("estimatedScore").asInt()).isEqualTo(14);
+        assertThat(draft.get("estimatedScore").asInt())
+                .as("问题越多分越低")
+                .isLessThan(completed.get("estimatedScore").asInt());
+        assertThat(completed.get("estimatedScore").asInt())
+                .isLessThan(accurate.get("estimatedScore").asInt());
+
+        for (JsonNode json : List.of(draft, completed, accurate)) {
+            assertThat(json.get("scoreMax").asInt()).isEqualTo(15);
+            assertThat(json.get("scoreBand").asText()).isNotBlank();
+            assertThat(json.get("referenceTranslation").asText())
+                    .as("参考译文应为英文且非空")
+                    .isNotBlank()
+                    .contains("digital economy");
+        }
     }
 
     @Test

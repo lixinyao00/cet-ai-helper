@@ -37,4 +37,6 @@
     <string name="translation_submitted_source">本次提交的中文原文</string>
     <string name="translation_submitted_draft">本次提交的英文译文</string>
     <string name="translation_resume">继续作答</string>
+    <string name="translation_history">历史批改</string>
+    <string name="translation_word_count_hint">实时词数统计</string>
 </resources>

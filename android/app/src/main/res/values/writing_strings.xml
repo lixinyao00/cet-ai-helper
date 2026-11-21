@@ -36,4 +36,6 @@
     <string name="writing_retest_pending">正在生成复测题…</string>
     <string name="writing_retest_title">新情境复测</string>
     <string name="writing_retest_answer">你的复测答案</string>
+    <string name="writing_history">历史批改</string>
+    <string name="writing_word_count_hint">0 词 · 建议 120–180 词</string>
 </resources>

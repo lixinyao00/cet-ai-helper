@@ -36,6 +36,7 @@ public class LiveWritingReviewClient {
               "issues": [{"type":"GRAMMAR","quote":"从 essay 逐字摘录的连续原文","detail":"中文解释","suggestion":"局部修改建议"}],
               "exercise": {"issueIndex":0,"instruction":"用中文说清作答方式","item":"提供完整的英语练习题面"}
             }
+            另请按四六级写作 15 分制给出 "estimatedScore"（整数）、"scoreMax":15 与 "scoreBand"（中文档位评语，如「第二档（13-15分）：切题，表达清楚」）。
             只列 0 到 3 条有明确依据、值得优先修改的问题，按优先级排列。接受语法正确、意思清楚的不同表达，不为凑数挑错。
             type 只能是 GRAMMAR（语法）、WORD_CHOICE（用词搭配）、MECHANICS（拼写、大小写或标点）、CLARITY（妨碍理解的表达）。
             quote 最多 240 字符，保留作文中的大小写、标点和空白，只引用 essay，不能改写、拼接或引用 prompt。
@@ -64,8 +65,12 @@ public class LiveWritingReviewClient {
             String overallFeedback = requireChineseText(payload.path("overallFeedback"));
             List<Issue> issues = readIssues(payload.path("issues"), submission.essay());
             Exercise exercise = readExercise(payload.path("exercise"), issues.size());
+            // 评分字段可选：缺失或类型不符都按「未返回」处理，不因此让整次批改失败。
             return new WritingReviewResponse(submission.prompt(), submission.essay(), overallFeedback, issues,
-                    exercise, "live");
+                    exercise, "live",
+                    scoreField(payload.path("estimatedScore")),
+                    scoreField(payload.path("scoreMax")),
+                    optionalText(payload.path("scoreBand")));
         } catch (JsonProcessingException | IllegalArgumentException ex) {
             // Keep model output and parser messages out of logs and error responses.
             log.warn("在线写作批改结果不符合约定");
@@ -101,5 +106,22 @@ public class LiveWritingReviewClient {
         }
         return new Exercise(index.intValue(), requireChineseText(node.path("instruction")),
                 requireText(node.path("item"), 400));
+    }
+
+    /** 读取 0–15 的整数评分；缺失、非整数或越界都返回 null。 */
+    private static Integer scoreField(JsonNode node) {
+        if (!node.isIntegralNumber() || !node.canConvertToInt()) {
+            return null;
+        }
+        int value = node.intValue();
+        return value < 0 || value > 15 ? null : value;
+    }
+
+    /** 可选的短文本；缺失、非字符串或空白都返回 null。 */
+    private static String optionalText(JsonNode node) {
+        if (!node.isTextual() || node.textValue().isBlank() || node.textValue().length() > 200) {
+            return null;
+        }
+        return node.textValue().trim();
     }
 }

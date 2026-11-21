@@ -22,3 +22,14 @@ server/data/
 .idea/
 *.iml
 .DS_Store
+
+# ===== 开发过程文档与本地 AI 协作/记忆文件 =====
+开发交接/
+.workbuddy/
+.claude/
+.cursor/
+.codex/
+.gemini/
+AGENTS.md
+CLAUDE.md
+PLAN.md

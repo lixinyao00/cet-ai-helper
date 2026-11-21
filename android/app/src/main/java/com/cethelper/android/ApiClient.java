@@ -23,7 +23,36 @@ import java.util.StringJoiner;
 
 final class ApiClient {
     record Student(long id, String username) {}
-    record Explanation(String meaning, String detail, String mode) {}
+
+    record Health(String status, String mode, String version) {}
+
+    record Explanation(String meaning, String detail, String mode,
+                       String phonetic, String partOfSpeech, String lemma,
+                       String cetLevel, boolean contextual) {
+        Explanation(String meaning, String detail, String mode) {
+            this(meaning, detail, mode, "", "", "", "", true);
+        }
+
+        String formattedMeta() {
+            StringJoiner joiner = new StringJoiner("  ");
+            if (!phonetic.isEmpty()) {
+                joiner.add(phonetic);
+            }
+            if (!partOfSpeech.isEmpty()) {
+                joiner.add(partOfSpeech);
+            }
+            if (!cetLevel.isEmpty()) {
+                joiner.add("· " + cetLevel);
+            }
+            if (!lemma.isEmpty()) {
+                joiner.add("原型: " + lemma);
+            }
+            if (!contextual) {
+                joiner.add("通用词典");
+            }
+            return joiner.toString();
+        }
+    }
 
     static final class Failure extends Exception {
         final int status;
@@ -67,6 +96,15 @@ final class ApiClient {
                 + uri.getRawPath().replaceAll("/+$", "");
     }
 
+    Health health() throws IOException, JSONException, Failure {
+        JSONObject body = request("GET", "/health", null, null);
+        String status = optClean(body, "status");
+        if (status.isEmpty()) {
+            status = "UP";
+        }
+        return new Health(status, optClean(body, "mode"), optClean(body, "version"));
+    }
+
     void register(String username, String password) throws IOException, JSONException, Failure {
         request("POST", "/auth/register", null, credentials(username, password));
     }
@@ -95,8 +133,19 @@ final class ApiClient {
             throws IOException, JSONException, Failure {
         JSONObject payload = new JSONObject().put("selection", selection).put("sentence", sentence);
         JSONObject body = request("POST", "/explanations", token, payload);
-        return new Explanation(body.getString("meaning"), body.getString("explanation"),
-                body.getString("mode"));
+        String mode = optClean(body, "mode");
+        if (mode.isEmpty()) {
+            mode = body.optBoolean("demo", false) ? "demo" : "live";
+        }
+        return new Explanation(
+                body.getString("meaning"),
+                body.getString("explanation"),
+                mode,
+                optClean(body, "phonetic"),
+                optClean(body, "partOfSpeech"),
+                optClean(body, "lemma"),
+                optClean(body, "cetLevel"),
+                body.optBoolean("contextual", true));
     }
 
     SentenceAnalysis analyze(String token, String sentence) throws IOException, JSONException, Failure {
@@ -185,6 +234,12 @@ final class ApiClient {
                 || !draft.equals(requiredText(body, "studentTranslation"))) {
             throw new JSONException("Unexpected translation review");
         }
+        return parseTranslationReview(body);
+    }
+
+    static TranslationFeedback.Review parseTranslationReview(JSONObject body) throws JSONException {
+        String source = requiredText(body, "sourceText");
+        String draft = requiredText(body, "studentTranslation");
         JSONArray issues = body.getJSONArray("issues");
         List<TranslationFeedback.Issue> results = new ArrayList<>(issues.length());
         for (int i = 0; i < issues.length(); i++) {
@@ -204,8 +259,13 @@ final class ApiClient {
             results.add(new TranslationFeedback.Issue(type, quote, requiredText(issue, "detail"),
                     requiredText(issue, "suggestion"), matches));
         }
+        int estimatedScore = parseOptionalScore(body, "estimatedScore");
+        int scoreMax = body.has("scoreMax") && !body.isNull("scoreMax") ? body.optInt("scoreMax", 15) : 15;
+        String scoreBand = optClean(body, "scoreBand");
+        String referenceTranslation = optClean(body, "referenceTranslation");
         return new TranslationFeedback.Review(source, draft, isDemo(body),
-                requiredText(body, "overallFeedback"), Collections.unmodifiableList(results));
+                requiredText(body, "overallFeedback"), Collections.unmodifiableList(results),
+                estimatedScore, scoreMax, scoreBand, referenceTranslation, body.toString());
     }
 
     WritingFeedback writingReview(String token, String prompt, String essay)
@@ -216,6 +276,12 @@ final class ApiClient {
         if (!prompt.equals(requiredText(body, "prompt")) || !essay.equals(submittedEssay)) {
             throw new JSONException("Unexpected writing review submission");
         }
+        return parseWritingReview(body);
+    }
+
+    static WritingFeedback parseWritingReview(JSONObject body) throws JSONException {
+        String prompt = requiredText(body, "prompt");
+        String submittedEssay = requiredText(body, "essay");
         JSONArray issues = body.getJSONArray("issues");
         if (issues.length() > 3) {
             throw new JSONException("Too many writing issues");
@@ -238,7 +304,7 @@ final class ApiClient {
                     requiredText(issue, "suggestion"), matches));
         }
         WritingFeedback.Exercise exercise = null;
-        if (body.has("exercise")) {
+        if (body.has("exercise") && !body.isNull("exercise")) {
             JSONObject item = body.getJSONObject("exercise");
             if (!(item.get("issueIndex") instanceof Integer index) || index < 0 || index >= results.size()) {
                 throw new JSONException("Invalid writing exercise issue index");
@@ -246,8 +312,12 @@ final class ApiClient {
             exercise = new WritingFeedback.Exercise(index, requiredText(item, "instruction"),
                     requiredText(item, "item"));
         }
+        int estimatedScore = parseOptionalScore(body, "estimatedScore");
+        int scoreMax = body.has("scoreMax") && !body.isNull("scoreMax") ? body.optInt("scoreMax", 15) : 15;
+        String scoreBand = optClean(body, "scoreBand");
         return new WritingFeedback(prompt, submittedEssay, isDemo(body), requiredText(body, "overallFeedback"),
-                Collections.unmodifiableList(results), exercise);
+                Collections.unmodifiableList(results), exercise,
+                estimatedScore, scoreMax, scoreBand, body.toString());
     }
 
     WritingFollowUp.Assessment gradeWritingExercise(String token, WritingFollowUp.Context context, String answer)
@@ -339,6 +409,29 @@ final class ApiClient {
             return text;
         }
         throw new JSONException("Missing text: " + key);
+    }
+
+    private static String optClean(JSONObject object, String key) {
+        if (!object.has(key) || object.isNull(key)) {
+            return "";
+        }
+        Object raw = object.opt(key);
+        if (raw instanceof String text) {
+            return ReadingArticle.trimSpace(text);
+        }
+        return "";
+    }
+
+    private static int parseOptionalScore(JSONObject body, String key) {
+        if (!body.has(key) || body.isNull(key)) {
+            return -1;
+        }
+        Object raw = body.opt(key);
+        if (raw instanceof Number number) {
+            int value = number.intValue();
+            return value >= 0 ? value : -1;
+        }
+        return -1;
     }
 
     private static JSONObject credentials(String username, String password) throws JSONException {

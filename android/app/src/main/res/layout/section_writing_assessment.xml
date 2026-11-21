@@ -1,33 +1,77 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
     android:orientation="vertical">
 
-    <TextView android:id="@+id/writing_answer_status" style="@style/StudyCaption"
-        android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:layout_marginTop="6dp" android:visibility="gone" android:accessibilityLiveRegion="polite" />
+    <TextView
+        android:id="@+id/writing_answer_status"
+        style="@style/StudyCaption"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:accessibilityLiveRegion="polite"
+        android:visibility="gone" />
 
-    <LinearLayout android:id="@+id/writing_assessment_content"
-        android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="vertical" android:layout_marginTop="8dp" android:padding="12dp"
-        android:background="@drawable/card" android:visibility="gone">
-        <TextView android:id="@+id/writing_answer_verdict" style="@style/StudyHeading"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:textSize="17sp" android:accessibilityLiveRegion="polite" />
-        <TextView style="@style/StudyCaption" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:layout_marginTop="8dp"
+    <LinearLayout
+        android:id="@+id/writing_assessment_content"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/card"
+        android:orientation="vertical"
+        android:padding="14dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/writing_answer_verdict"
+            style="@style/StudyHeading"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:accessibilityLiveRegion="polite"
+            android:textColor="@color/accent"
+            android:textSize="17sp" />
+
+        <TextView
+            style="@style/StudyCaption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
             android:text="@string/writing_answer_snapshot" />
-        <TextView android:id="@+id/writing_answer_snapshot" style="@style/StudyCaption"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="4dp" android:textColor="@color/ink"
-            android:textIsSelectable="true" android:saveEnabled="false" />
-        <TextView android:id="@+id/writing_answer_candidates" style="@style/StudyCaption"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="4dp" android:visibility="gone" />
-        <TextView android:id="@+id/writing_answer_feedback" style="@style/StudyCaption"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
+
+        <TextView
+            android:id="@+id/writing_answer_snapshot"
+            style="@style/StudyCaption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/tone_card"
+            android:padding="10dp"
+            android:saveEnabled="false"
+            android:textColor="@color/ink"
+            android:textIsSelectable="true" />
+
+        <TextView
+            android:id="@+id/writing_answer_candidates"
+            style="@style/StudyCaption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/writing_answer_feedback"
+            style="@style/StudyCaption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:layout_marginTop="8dp" />
-        <TextView android:id="@+id/writing_answer_next_step" style="@style/StudyCaption"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="6dp" android:textColor="@color/ink" />
+
+        <TextView
+            android:id="@+id/writing_answer_next_step"
+            style="@style/StudyCaption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:fontFamily="sans-serif-medium"
+            android:textColor="@color/ink" />
     </LinearLayout>
 </LinearLayout>

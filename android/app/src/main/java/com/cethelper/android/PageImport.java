@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -11,18 +12,21 @@ import android.provider.MediaStore;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.core.content.FileProvider;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
 final class PageImport {
     private static final int CAPTURE_REQUEST = 21;
     private static final int PICK_REQUEST = 22;
+    private static final int PREVIEW_MAX_EDGE = 1280;
     private static final int CAMERA_GRANT = Intent.FLAG_GRANT_READ_URI_PERMISSION
             | Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
     private static final Pattern ENGLISH_LETTER = Pattern.compile("[A-Za-z]");
@@ -39,7 +43,11 @@ final class PageImport {
     private int request;
     private String articleId;
     private String cameraFile;
+    private final ArrayList<String> extraCameraFiles = new ArrayList<>();
     private Uri image;
+    private boolean appending;
+    private boolean imageCollapsed;
+    private String reviewNotice;
     private String title = "";
     private String body = "";
     private String message;
@@ -56,12 +64,23 @@ final class PageImport {
             request = saved.getInt("request");
             articleId = saved.getString("article");
             cameraFile = saved.getString("cameraFile");
+            ArrayList<String> extras = saved.getStringArrayList("extraCameraFiles");
+            if (extras != null) {
+                extraCameraFiles.addAll(extras);
+            }
             String savedImage = saved.getString("image");
             image = savedImage == null ? null : Uri.parse(savedImage);
+            appending = saved.getBoolean("appending", false);
+            imageCollapsed = saved.getBoolean("imageCollapsed", false);
+            reviewNotice = saved.getString("reviewNotice");
             title = saved.getString("title", "");
             body = saved.getString("body", "");
             message = saved.getString("message");
         }
+    }
+
+    boolean isActive() {
+        return stage != null;
     }
 
     Bundle saveState() {
@@ -76,7 +95,11 @@ final class PageImport {
         saved.putInt("request", request);
         saved.putString("article", articleId);
         saved.putString("cameraFile", cameraFile);
+        saved.putStringArrayList("extraCameraFiles", new ArrayList<>(extraCameraFiles));
         saved.putString("image", image == null ? null : image.toString());
+        saved.putBoolean("appending", appending);
+        saved.putBoolean("imageCollapsed", imageCollapsed);
+        saved.putString("reviewNotice", reviewNotice);
         saved.putString("title", stage == Stage.REVIEW && titleField != null ? titleField.getText().toString() : title);
         saved.putString("body", stage == Stage.REVIEW && bodyField != null ? bodyField.getText().toString() : body);
         saved.putString("message", message);
@@ -107,6 +130,29 @@ final class PageImport {
         target = destination;
         owner = host.articleOwner();
         articleId = target == Target.READING ? UUID.randomUUID().toString() : null;
+        appending = false;
+        startCaptureOrPicker(camera);
+    }
+
+    @SuppressWarnings("deprecation")
+    private void launchAppend(boolean camera) {
+        if (titleField != null) {
+            title = titleField.getText().toString();
+        }
+        if (bodyField != null) {
+            body = bodyField.getText().toString();
+        }
+        if (cameraFile != null) {
+            extraCameraFiles.add(cameraFile);
+            cameraFile = null;
+        }
+        reviewNotice = null;
+        appending = true;
+        startCaptureOrPicker(camera);
+    }
+
+    @SuppressWarnings("deprecation")
+    private void startCaptureOrPicker(boolean camera) {
         request = camera ? CAPTURE_REQUEST : PICK_REQUEST;
         stage = Stage.EXTERNAL;
         showStatus(camera ? "等待系统相机…" : "等待相册选择…", false);
@@ -128,7 +174,16 @@ final class PageImport {
                 openPicker();
             }
         } catch (ActivityNotFoundException | IOException | SecurityException failure) {
-            fail(camera ? "无法打开系统相机，请重拍或改从相册选择。" : "无法打开图片选择器，请重选或改用相机。");
+            String reason = camera ? "无法打开系统相机，请重拍或改从相册选择。"
+                    : "无法打开图片选择器，请重选或改用相机。";
+            if (appending) {
+                appending = false;
+                reviewNotice = reason;
+                stage = Stage.REVIEW;
+                showEditor();
+            } else {
+                fail(reason);
+            }
         }
     }
 
@@ -153,7 +208,13 @@ final class PageImport {
         }
         ArticleOwner activeOwner = host.articleOwner();
         if (result != Activity.RESULT_OK) {
-            if (activeOwner != null) {
+            if (appending) {
+                appending = false;
+                stage = Stage.REVIEW;
+                if (activeOwner != null) {
+                    showEditor();
+                }
+            } else if (activeOwner != null) {
                 cancel();
             } else {
                 reset();
@@ -173,6 +234,9 @@ final class PageImport {
         clearImage();
         stage = null;
         owner = null;
+        appending = false;
+        imageCollapsed = false;
+        reviewNotice = null;
         title = "";
         body = "";
         message = null;
@@ -192,6 +256,10 @@ final class PageImport {
             new File(captureDirectory(), cameraFile).delete();
             cameraFile = null;
         }
+        for (String extra : extraCameraFiles) {
+            new File(captureDirectory(), extra).delete();
+        }
+        extraCameraFiles.clear();
         image = null;
     }
 
@@ -206,7 +274,7 @@ final class PageImport {
 
     private void recognize() {
         if (image == null) {
-            fail("没有收到图片，请重拍或重选。");
+            handleRecognizeError("没有收到图片，请重拍或重选。");
             return;
         }
         boolean chinese = target == Target.TRANSLATION;
@@ -215,21 +283,39 @@ final class PageImport {
             if (!host.isCurrent(progress)) {
                 return;
             }
-            clearImage();
             if (result == null) {
-                fail("无法读取或识别这张图片，请重拍或重选。");
+                handleRecognizeError("无法读取或识别这张图片，请重拍或重选。");
             } else if (chinese ? result.codePoints().noneMatch(
                     code -> Character.UnicodeScript.of(code) == Character.UnicodeScript.HAN)
                     : !ENGLISH_LETTER.matcher(result).find()) {
-                fail(chinese ? "未识别到中文文字，请重拍或重选。" : "未识别到英文文字，请重拍或重选。");
-            } else if (result.length() > 50000) {
-                fail("这一页的识别结果过长，请缩小拍摄范围或重选。");
+                handleRecognizeError(chinese ? "未识别到中文文字，请重拍或重选。" : "未识别到英文文字，请重拍或重选。");
+            } else if ((appending ? body.length() + 2 : 0) + result.length() > 50000) {
+                handleRecognizeError("识别结果总长度超过限制，请缩小拍摄范围或分篇保存。");
             } else {
-                body = result;
+                if (appending) {
+                    body = body.isEmpty() ? result : body + "\n\n" + result;
+                    reviewNotice = "已追加新的一页识别内容。";
+                    appending = false;
+                } else {
+                    body = result;
+                    reviewNotice = null;
+                }
+                // Retain the temporary image until the user saves or cancels the import flow.
                 stage = Stage.REVIEW;
                 showEditor();
             }
         });
+    }
+
+    private void handleRecognizeError(String reason) {
+        if (appending) {
+            appending = false;
+            reviewNotice = reason + " 已保留原有内容。";
+            stage = Stage.REVIEW;
+            showEditor();
+        } else {
+            fail(reason);
+        }
     }
 
     private void fail(String reason) {
@@ -240,7 +326,7 @@ final class PageImport {
     }
 
     private View showStatus(String status, boolean failed) {
-        View page = host.show(R.layout.screen_import_status, this::cancel);
+        View page = host.showImportScreen(R.layout.screen_import_status, this::cancel);
         page.<TextView>findViewById(R.id.import_message).setText(status);
         page.findViewById(R.id.import_progress).setVisibility(failed ? View.GONE : View.VISIBLE);
         page.findViewById(R.id.import_cancel).setOnClickListener(v -> cancel());
@@ -254,7 +340,7 @@ final class PageImport {
     }
 
     private View showEditor() {
-        View editor = host.show(R.layout.screen_import_review, this::cancel);
+        View editor = host.showImportScreen(R.layout.screen_import_review, this::cancel);
         titleField = editor.findViewById(R.id.import_title);
         bodyField = editor.findViewById(R.id.import_body);
         titleField.setText(title);
@@ -265,9 +351,96 @@ final class PageImport {
             editor.<TextView>findViewById(R.id.import_review_hint).setText(R.string.translation_ocr_review);
             editor.<TextView>findViewById(R.id.import_confirm).setText(R.string.translation_start);
         }
+        TextView status = editor.findViewById(R.id.import_review_status);
+        if (reviewNotice != null && !reviewNotice.isEmpty()) {
+            status.setText(reviewNotice);
+            status.setVisibility(View.VISIBLE);
+        } else {
+            status.setVisibility(View.GONE);
+        }
+        bindImagePreview(editor);
+        bindAppendActions(editor);
         editor.findViewById(R.id.import_cancel).setOnClickListener(v -> cancel());
         editor.findViewById(R.id.import_confirm).setOnClickListener(v -> confirm(editor));
         return editor;
+    }
+
+    private void bindImagePreview(View editor) {
+        View container = UiViews.findOptionalView(editor, "import_review_image_container");
+        ImageView preview = UiViews.findOptionalView(editor, "import_review_image", ImageView.class);
+        View toggle = UiViews.findOptionalView(editor, "import_review_toggle_image");
+        if (image == null || (container == null && preview == null)) {
+            if (container != null) {
+                container.setVisibility(View.GONE);
+            }
+            if (preview != null) {
+                preview.setVisibility(View.GONE);
+            }
+            if (toggle != null) {
+                toggle.setVisibility(View.GONE);
+            }
+            return;
+        }
+        if (container != null) {
+            container.setVisibility(View.VISIBLE);
+        }
+        if (toggle != null) {
+            toggle.setVisibility(View.VISIBLE);
+            Runnable updateToggle = () -> {
+                if (preview != null) {
+                    preview.setVisibility(imageCollapsed ? View.GONE : View.VISIBLE);
+                } else if (container != null) {
+                    container.setVisibility(imageCollapsed ? View.GONE : View.VISIBLE);
+                }
+                if (toggle instanceof TextView toggleText) {
+                    toggleText.setText(imageCollapsed ? "展开原图对照" : "收起原图对照");
+                }
+            };
+            updateToggle.run();
+            toggle.setOnClickListener(v -> {
+                imageCollapsed = !imageCollapsed;
+                updateToggle.run();
+            });
+        } else if (preview != null) {
+            preview.setVisibility(View.VISIBLE);
+        }
+        if (preview != null) {
+            Uri previewUri = image;
+            app.images.execute(() -> {
+                try {
+                    Bitmap bitmap = PageOcr.decodePreview(app.getContentResolver(), previewUri, PREVIEW_MAX_EDGE);
+                    host.runOnUiThread(() -> {
+                        if (host.isCurrent(editor)) {
+                            preview.setImageBitmap(bitmap);
+                        } else if (bitmap != null) {
+                            bitmap.recycle();
+                        }
+                    });
+                } catch (IOException | RuntimeException ignored) {
+                    host.runOnUiThread(() -> {
+                        if (host.isCurrent(editor)) {
+                            if (container != null) {
+                                container.setVisibility(View.GONE);
+                            }
+                            if (toggle != null) {
+                                toggle.setVisibility(View.GONE);
+                            }
+                        }
+                    });
+                }
+            });
+        }
+    }
+
+    private void bindAppendActions(View editor) {
+        View appendCamera = UiViews.findOptionalView(editor, "import_review_append_camera");
+        View appendGallery = UiViews.findOptionalView(editor, "import_review_append_gallery");
+        if (appendCamera != null) {
+            appendCamera.setOnClickListener(v -> launchAppend(true));
+        }
+        if (appendGallery != null) {
+            appendGallery.setOnClickListener(v -> launchAppend(false));
+        }
     }
 
     private void confirm(View editor) {
@@ -336,5 +509,13 @@ final class PageImport {
         bodyField.setEnabled(enabled);
         editor.findViewById(R.id.import_confirm).setEnabled(enabled);
         editor.findViewById(R.id.import_cancel).setEnabled(enabled);
+        View appendCamera = UiViews.findOptionalView(editor, "import_review_append_camera");
+        if (appendCamera != null) {
+            appendCamera.setEnabled(enabled);
+        }
+        View appendGallery = UiViews.findOptionalView(editor, "import_review_append_gallery");
+        if (appendGallery != null) {
+            appendGallery.setEnabled(enabled);
+        }
     }
 }

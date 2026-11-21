@@ -71,4 +71,26 @@
     <string name="replace_translation_confirm">替换中文原文并清空当前英文草稿。</string>
     <string name="replace_confirm">替换</string>
     <string name="clear_confirm">清空</string>
+    <string name="home_dashboard_title">今日学习概览</string>
+    <string name="home_stat_due">待复习生词</string>
+    <string name="home_stat_vocab">累计生词</string>
+    <string name="home_stat_articles">阅读篇章</string>
+    <string name="home_quick_actions">学习工作台</string>
+    <string name="reader_font_toggle">字号</string>
+    <string name="reader_word_speak">朗读</string>
+    <string name="reader_word_close">收起</string>
+    <string name="article_delete">删除</string>
+    <string name="import_review_image_label">原图对照</string>
+    <string name="import_review_toggle_image">折叠/展开</string>
+    <string name="import_review_image_desc">待校对原图</string>
+    <string name="import_review_append_camera">+ 追加拍一页</string>
+    <string name="import_review_append_gallery">+ 选图追加</string>
+    <string name="vocabulary_search_hint">搜索生词、释义或原句…</string>
+    <string name="vocabulary_delete">移除</string>
+    <string name="cloze_hint">首字母提示</string>
+    <string name="cloze_retry_wrong">仅重练错题</string>
+    <string name="history_records">历史记录</string>
+    <string name="estimated_score_label">四六级预估分</string>
+    <string name="reference_translation_label">参考译文</string>
+    <string name="word_count_initial">0 词</string>
 </resources>

@@ -71,6 +71,24 @@ class WritingReviewDemoApiTest {
     }
 
     @Test
+    void scoresFollowEssayQualityAndBandIsExplained() throws Exception {
+        JsonNode draft = ApiTestSupport.body(writingReview(mvc, token, PROMPT, DRAFT)
+                .andExpect(status().isOk())
+                .andReturn());
+        JsonNode revision = ApiTestSupport.body(writingReview(mvc, token, PROMPT, REVISION)
+                .andExpect(status().isOk())
+                .andReturn());
+
+        assertThat(draft.get("estimatedScore").asInt()).isEqualTo(10);
+        assertThat(revision.get("estimatedScore").asInt()).isEqualTo(14);
+        assertThat(revision.get("estimatedScore").asInt()).isGreaterThan(draft.get("estimatedScore").asInt());
+        assertThat(draft.get("scoreMax").asInt()).isEqualTo(15);
+        assertThat(revision.get("scoreMax").asInt()).isEqualTo(15);
+        assertThat(draft.get("scoreBand").asText()).isNotBlank().contains("档");
+        assertThat(revision.get("scoreBand").asText()).isNotBlank().contains("档");
+    }
+
+    @Test
     void unsupportedPromptOrEssayReturnsDemoScope() throws Exception {
         writingReview(mvc, token, "Write about time management.", DRAFT)
                 .andExpect(status().isUnprocessableEntity())

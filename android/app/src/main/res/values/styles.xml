@@ -10,18 +10,27 @@
         <item name="android:textColorSecondary">@color/muted</item>
     </style>
     <style name="Theme.CetStudy" parent="Theme.CetStudy.Base" />
+
     <style name="StudyHeading.Base" parent="">
         <item name="android:textColor">@color/ink</item>
-        <item name="android:textSize">30sp</item>
+        <item name="android:textSize">28sp</item>
         <item name="android:fontFamily">sans-serif-medium</item>
         <item name="android:lineSpacingExtra">3dp</item>
     </style>
     <style name="StudyHeading" parent="StudyHeading.Base" />
+
+    <style name="StudySectionTitle" parent="">
+        <item name="android:textColor">@color/ink</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+
     <style name="StudyCaption">
         <item name="android:textColor">@color/muted</item>
         <item name="android:textSize">14sp</item>
         <item name="android:lineSpacingExtra">3dp</item>
     </style>
+
     <style name="StudyPrimaryButton" parent="android:style/Widget.Material.Light.Button">
         <item name="android:background">@drawable/primary_button</item>
         <item name="android:textColor">@color/primary_text</item>
@@ -31,7 +40,23 @@
         <item name="android:minHeight">48dp</item>
         <item name="android:paddingStart">16dp</item>
         <item name="android:paddingEnd">16dp</item>
+        <item name="android:stateListAnimator">@null</item>
+        <item name="android:elevation">0dp</item>
     </style>
+
+    <style name="StudySecondaryButton" parent="android:style/Widget.Material.Light.Button">
+        <item name="android:background">@drawable/secondary_button</item>
+        <item name="android:textColor">@color/secondary_text</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="android:stateListAnimator">@null</item>
+        <item name="android:elevation">0dp</item>
+    </style>
+
     <style name="StudyTextButton" parent="android:style/Widget.Material.Light.Button.Borderless">
         <item name="android:textColor">@color/accent</item>
         <item name="android:textAllCaps">false</item>
@@ -39,22 +64,51 @@
         <item name="android:textSize">14sp</item>
         <item name="android:minHeight">48dp</item>
     </style>
+
+    <style name="StudyDangerTextButton" parent="StudyTextButton">
+        <item name="android:textColor">@color/danger</item>
+    </style>
+
     <style name="StudyField" parent="android:style/Widget.Material.Light.EditText">
         <item name="android:background">@drawable/card</item>
-        <item name="android:minHeight">56dp</item>
+        <item name="android:minHeight">54dp</item>
         <item name="android:paddingStart">16dp</item>
         <item name="android:paddingEnd">16dp</item>
         <item name="android:textSize">16sp</item>
         <item name="android:textColor">@color/ink</item>
         <item name="android:textColorHint">@color/muted</item>
     </style>
+
     <style name="StudyParagraph">
         <item name="android:textColor">@color/ink</item>
-        <item name="android:textSize">23sp</item>
+        <item name="android:textSize">21sp</item>
         <item name="android:fontFamily">serif</item>
-        <item name="android:lineSpacingExtra">7dp</item>
+        <item name="android:lineSpacingExtra">8dp</item>
         <item name="android:textIsSelectable">true</item>
         <item name="android:breakStrategy">simple</item>
         <item name="android:hyphenationFrequency">none</item>
+    </style>
+
+    <style name="StudyBadge">
+        <item name="android:background">@drawable/badge_pill</item>
+        <item name="android:textColor">@color/badge_text</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:paddingStart">10dp</item>
+        <item name="android:paddingEnd">10dp</item>
+        <item name="android:paddingTop">4dp</item>
+        <item name="android:paddingBottom">4dp</item>
+    </style>
+
+    <style name="StudyStatValue">
+        <item name="android:textColor">@color/accent</item>
+        <item name="android:textSize">24sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+
+    <style name="StudyStatLabel">
+        <item name="android:textColor">@color/muted</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:layout_marginTop">2dp</item>
     </style>
 </resources>

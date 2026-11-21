@@ -37,7 +37,13 @@ final class TranslationFeedback {
     record HintItem(String title, String guidance) {}
     record Hint(boolean demo, List<HintItem> items) {}
     record Issue(IssueType type, String quote, String detail, String suggestion, List<ReviewQuote.Range> matches) {}
-    record Review(String source, String submittedDraft, boolean demo, String overall, List<Issue> issues) {
+    record Review(String source, String submittedDraft, boolean demo, String overall, List<Issue> issues,
+                  int estimatedScore, int scoreMax, String scoreBand, String referenceTranslation,
+                  String rawJson) {
+        Review(String source, String submittedDraft, boolean demo, String overall, List<Issue> issues) {
+            this(source, submittedDraft, demo, overall, issues, -1, 15, "", "", "");
+        }
+
         String snapshot(IssueType type) {
             return type == IssueType.OMISSION ? source : submittedDraft;
         }

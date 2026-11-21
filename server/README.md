@@ -503,6 +503,7 @@ java -cp "$(cat target/migration-classpath.txt)" tools/MigrateH2ToMysql.java \
 | POST | `/api/v1/auth/register` | 无 | `201` | 注册学生账号 |
 | POST | `/api/v1/auth/login` | 无 | `200` | 登录，换取会话凭证 |
 | GET | `/api/v1/me` | Bearer | `200` | 查询当前登录用户 |
+| GET | `/api/v1/health` | 无 | `200` | 健康与模式探测：`status` / `mode` / `version`，供客户端「测试连接」 |
 | POST | `/api/v1/auth/logout` | Bearer | `204` | 退出登录，撤销当前凭证（无响应体） |
 | POST | `/api/v1/explanations` | Bearer | `200` | 查询选词在所在原句中的中文语境释义 |
 | POST | `/api/v1/sentence-analyses` | Bearer | `200` | 翻译整句并拆解长难句：主干概括 + 按原文顺序的语法片段 |
@@ -646,12 +647,30 @@ Authorization: Bearer <accessToken>
 成功 `200`：
 
 ```json
-{"meaning":"婉拒","explanation":"这里作动词，指学生谢绝邀请。","mode":"demo"}
+{
+  "meaning": "婉拒",
+  "explanation": "这里作动词，指学生谢绝邀请。",
+  "mode": "demo",
+  "phonetic": "/dɪˈklaɪn/",
+  "partOfSpeech": "v.",
+  "lemma": "decline",
+  "cetLevel": "CET-4",
+  "contextual": true
+}
 ```
 
 - `meaning`：短释义（中文，可在面板上做主展示）；
 - `explanation`：说明它在这句话里怎么用（中文）；
-- `mode`：`demo` 或 `live`。客户端在 `demo` 时应在面板上标明「演示释义」。
+- `mode`：`demo` 或 `live`。客户端在 `demo` 时应在面板上标明「演示释义」；
+- `phonetic`：音标，形如 `/dɪˈklaɪn/`；
+- `partOfSpeech`：词性缩写，如 `n.`、`v.`、`adj.`、`phr.`；
+- `lemma`：选词的原形（词条）；
+- `cetLevel`：`CET-4` 或 `CET-6`；
+- `contextual`：`true` 表示释义贴合原句语境（三条精调样例与 live 结果）；`false` 表示命中了内置四六级词表，只是**通用词典释义**，不代表该词在这句话里的具体用法。
+
+> **Demo 词表兜底（0.2.0 起）**：demo 模式先按「原句 + 选词」精确匹配三条精调样例；未命中时再查内置四六级高频词表（含 `decline`、`demand`、`reading`、`bookstore`、`digital` 等常用词，并支持 `-s / -es / -ies / -ed / -ied / -ing` 还原原形），命中则返回 `200` 且 `contextual = false`，不再抛 422。只有词表里也没有的选词才返回 `422 DEMO_UNSUPPORTED`。客户端可在 `contextual = false` 时注明「词典释义（未结合本句）」。
+
+> **新增字段向后兼容**：五个新字段都是可选的。live 模型没有返回时，`phonetic` / `partOfSpeech` / `lemma` / `cetLevel` 会直接**省略**（JSON 中不出现），`contextual` 固定为 `true`；旧客户端按原有三个字段解析不受影响。
 
 失败：
 
@@ -661,7 +680,7 @@ Authorization: Bearer <accessToken>
 | 选词不在原句中（如 `increase` 配 `The report attributed the decline to lower demand.`） | `400` `INVALID_INPUT`「选词必须是原句中的连续原文。」 |
 | 选词或原句超长 | `400` `INVALID_INPUT`「选词过长，请重新选择。」／「原句过长，请重新选择。」 |
 | 请求体不是合法 JSON 或字段类型错误 | `400` `INVALID_INPUT`「请求体不是合法的 JSON，或字段类型不正确。」／字段是数字或布尔值时：「请求字段类型不正确：字符串字段请使用 JSON 字符串。」 |
-| demo 未收录该组合 | `422` `DEMO_UNSUPPORTED` |
+| demo 未收录该组合，且选词不在内置四六级词表中 | `422` `DEMO_UNSUPPORTED` |
 | 上游失败 / 返回不可解析 / 字段为空（仅 live） | `502` `MODEL_ERROR` |
 | 上游超时（仅 live） | `504` `MODEL_TIMEOUT` |
 
@@ -998,7 +1017,11 @@ Content-Type: application/json
       "suggestion": "改为 work well in a team（或 have strong teamwork skills）。"
     }
   ],
-  "mode": "demo"
+  "mode": "demo",
+  "estimatedScore": 9,
+  "scoreMax": 15,
+  "scoreBand": "第四档（7-9分）：基本表达原文意思，但有较多漏译与不地道搭配。",
+  "referenceTranslation": "As the digital economy develops rapidly, mastering basic programming skills is becoming increasingly important for college graduates. Therefore, many companies are more willing to hire young people who can both think independently and work in a team."
 }
 ```
 
@@ -1010,7 +1033,11 @@ Content-Type: application/json
   "studentTranslation": "As the digital economy develops rapidly, it is becoming increasingly important for college graduates to master basic programming skills. As a result, many companies prefer to hire young people who can think independently and work well in a team.",
   "overallFeedback": "补全后信息完整：「对高校毕业生」「越来越」都已交代，team cooperation 也换成了 work well in a team，搭配自然。上一版被标出的问题都不再出现，可以提交。",
   "issues": [],
-  "mode": "demo"
+  "mode": "demo",
+  "estimatedScore": 12,
+  "scoreMax": 15,
+  "scoreBand": "第二档（10-12分）：基本达意，无明显漏译，个别表达仍可更自然。",
+  "referenceTranslation": "As the digital economy develops rapidly, mastering basic programming skills is becoming increasingly important for college graduates. Therefore, many companies are more willing to hire young people who can both think independently and work in a team."
 }
 ```
 
@@ -1024,6 +1051,12 @@ Content-Type: application/json
 | `issues[].detail` | string | 中文说明：漏了什么，或为什么不自然 |
 | `issues[].suggestion` | string | 局部修改建议（不是整段参考译文） |
 | `mode` | string | `demo` 或 `live`；`demo` 时界面标注「演示批改」 |
+| `estimatedScore` | integer，可选 | 四六级 15 分制预估分。内置样例：草稿 9、补全稿 12、准确/另一种合理译法 14 |
+| `scoreMax` | integer，可选 | 评分满分，当前为 `15` |
+| `scoreBand` | string，可选 | 中文档位评语，与 `estimatedScore` 落在同一档 |
+| `referenceTranslation` | string，可选 | 内置标准参考译文，供学生对照 |
+
+> 评分四字段是**可选新增字段**：demo 内置样例一定返回；live 只在模型给出时返回，模型没给时字段直接省略（JSON 中不出现），客户端做空安全解析、缺省时不展示评分徽章即可，旧契约不变。
 
 **引用定位约定**（乱序引用必须能正确展示）：
 
@@ -1085,6 +1118,11 @@ Content-Type: application/json
 | `exercise.issueIndex` | integer | 对应本次响应 `issues` 的下标，从 0 开始。如果界面重排问题，按重排前的下标关联。 |
 | `exercise.instruction` / `exercise.item` | string | 中文作答指令与完整练习题面。 |
 | `mode` | string | `demo` 或 `live`。安卓可在 `demo` 结果上标注「演示批改」。 |
+| `estimatedScore` | integer，可选 | 四六级写作 15 分制预估分。内置样例：草稿 10、修订稿 14。 |
+| `scoreMax` | integer，可选 | 评分满分，当前为 `15`。 |
+| `scoreBand` | string，可选 | 中文档位评语（如「第一档（13-15分）：切题，表达清楚」）。 |
+
+> 评分三字段是可选新增字段：demo 内置两稿一定返回，live 只在模型给出时返回；模型没给时字段省略，客户端做空安全解析、缺省时不展示评分即可。
 
 **Demo 复现**
 
@@ -1136,7 +1174,10 @@ done
     "instruction": "从括号内选出与主语一致的动词形式，并写下完整句子。",
     "item": "The volunteers at the animal shelter (feeds / feed) the dogs every morning."
   },
-  "mode": "demo"
+  "mode": "demo",
+  "estimatedScore": 10,
+  "scoreMax": 15,
+  "scoreBand": "第三档（10-12分）：基本切题，条理不够清晰，有较多语言错误，需要修改后再提交。"
 }
 ```
 
@@ -1157,7 +1198,10 @@ done
   "essay": "Many students prefer to spend their weekends relaxing, but volunteering is another way to use that time well. It gives college students a chance to help others while putting what they learn in class into practice.\n\nLast semester, our class organized a weekend cleanup near the campus. At first, we all wanted to work on the same street, and no one had brought enough bags. We divided the area into smaller sections and asked a nearby shop for extra bags. By the end of the morning, we had learned how to share tasks and solve a problem together.\n\nA student does not have to volunteer every weekend to benefit. Even a few hours a month can build confidence and make the local community a better place to live.",
   "overallFeedback": "文章切题，清洁活动的细节说明了志愿服务为什么能锻炼协作和解决问题的能力。开头、事例和结尾衔接清楚。",
   "issues": [],
-  "mode": "demo"
+  "mode": "demo",
+  "estimatedScore": 14,
+  "scoreMax": 15,
+  "scoreBand": "第一档（13-15分）：切题，表达清楚，文字连贯，只有个别语言错误。"
 }
 ```
 
@@ -1465,6 +1509,30 @@ Live 复用第 3.3 节的模型配置。判答时模型收到原问题、原练�
 
 ---
 
+### 6.12 `GET /api/v1/health`（健康与模式探测，无需 Bearer）
+
+客户端在设置服务器地址时可调用该接口「测试连接」，并据 `mode` 显示当前连接的是「Demo 演示模式」还是「Live 真实模型」。该接口**不要求** `Authorization` 头；带不带凭证都返回同样的结果。
+
+```bash
+curl -sS -w '\nHTTP %{http_code}\n' "$BASE_URL/api/v1/health"
+```
+
+成功 `200`（demo 模式）：
+
+```json
+{"status":"UP","mode":"demo","version":"0.2.0"}
+```
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `status` | string | 固定 `UP`，表示服务可用 |
+| `mode` | string | `demo` 或 `live`，与释义/批改接口当前使用的 `CET_EXPLANATION_MODE` 一致 |
+| `version` | string | 服务版本号，当前为 `0.2.0` |
+
+响应固定为这三个字段，不含账号、凭证或模型密钥；live 模式只改变 `mode` 的值。
+
+---
+
 ## 7. 一套 curl 跑通全流程
 
 前提：已按 [3.1](#31-demo-模式默认无需任何密钥) 起好 demo 服务，且终端在仓库根目录（本脚本不依赖 `server/` 路径）。
@@ -1570,10 +1638,18 @@ curl -sS -w '\nHTTP %{http_code}\n' -X POST "$BASE_URL/api/v1/explanations" \
   -H "$JSON" -H "Authorization: Bearer $TOKEN_A" \
   -d '{"selection":"increase","sentence":"The report attributed the decline to lower demand."}'
 
-echo "# 5.2 选词在原句中但 demo 未收录 -> 期望 422 DEMO_UNSUPPORTED"
+echo "# 5.2 选词在原句中但 demo 未收录（也不在内置四六级词表）-> 期望 422 DEMO_UNSUPPORTED"
 curl -sS -w '\nHTTP %{http_code}\n' -X POST "$BASE_URL/api/v1/explanations" \
   -H "$JSON" -H "Authorization: Bearer $TOKEN_A" \
-  -d '{"selection":"attributed","sentence":"The report attributed the decline to lower demand."}'
+  -d '{"selection":"quizzacious","sentence":"The quizzacious remark ended the talk."}'
+
+echo "# 5.2b demo 词表兜底：常用词在任意句子中都可查 -> 期望 200，contextual=false"
+curl -sS -w '\nHTTP %{http_code}\n' -X POST "$BASE_URL/api/v1/explanations" \
+  -H "$JSON" -H "Authorization: Bearer $TOKEN_A" \
+  -d '{"selection":"bookstore","sentence":"When a physical bookstore closes, a neighborhood loses more than a place to buy paperbacks."}'
+
+echo "# 5.2c 健康与模式探测（无需凭证）-> 期望 200 {\"status\":\"UP\",\"mode\":\"demo\",\"version\":\"0.2.0\"}"
+curl -sS -w '\nHTTP %{http_code}\n' "$BASE_URL/api/v1/health"
 
 echo "# 5.3 匿名访问受保护接口（不带 Authorization）-> 期望 401 UNAUTHORIZED"
 curl -sS -w '\nHTTP %{http_code}\n' "$BASE_URL/api/v1/me"
@@ -1638,10 +1714,12 @@ echo "### 完成。若各步状态码与注释一致，说明账号、会话、�
 | 4.4 | 整句分析 + 内置长句（含从句） | 200，`mode=demo`，6 个 `chunks` 按原句顺序，`structure` 指出主句 `experienced teachers insist` |
 | 4.5 | 整句分析 + `Some students decline the invitation.` | 200，`mode=demo`，3 个 `chunks` |
 | 4.6 | 汉译英结构提示（内置材料 + `structure`） | 200，`mode=demo`，`structure.mainClause` 点出两句主干，2 个分句 + 2 处连接方式 |
-| 4.7 | 汉译英批改：草稿译文 | 200，`issues` 3 条（`OMISSION` / `OMISSION` / `UNNATURAL`），引用逐字可查 |
-| 4.8 | 汉译英批改：补全后的译文 | 200，`issues` 为空数组，草稿里的漏译引用不再出现 |
+| 4.7 | 汉译英批改：草稿译文 | 200，`issues` 3 条（`OMISSION` / `OMISSION` / `UNNATURAL`），引用逐字可查；`estimatedScore=9`、`scoreMax=15` |
+| 4.8 | 汉译英批改：补全后的译文 | 200，`issues` 为空数组，草稿里的漏译引用不再出现；`estimatedScore=12` |
 | 5.1 | 选词不在原句 | 400 `INVALID_INPUT` |
-| 5.2 | demo 未收录该选词 | 422 `DEMO_UNSUPPORTED` |
+| 5.2 | demo 未收录该选词（词表外） | 422 `DEMO_UNSUPPORTED` |
+| 5.2b | demo 词表兜底：`bookstore` | 200，`contextual=false`，带 `phonetic` / `partOfSpeech` / `lemma` / `cetLevel` |
+| 5.2c | `GET /api/v1/health`（无凭证） | 200，`status=UP`、`mode=demo`、`version=0.2.0` |
 | 5.3 | 匿名 `/me` | 401 `UNAUTHORIZED` |
 | 5.4 | 重复注册 | 409 `USERNAME_TAKEN` |
 | 5.5 | 口令错误 | 401 `INVALID_CREDENTIALS` |
@@ -1681,17 +1759,17 @@ echo "### 完成。若各步状态码与注释一致，说明账号、会话、�
 | `Some students decline the invitation.` | `decline` | 婉拒 | 这里作动词，指学生谢绝邀请。 |
 | `The report attributed the decline to lower demand.` | `lower demand` | 较低的需求 | 需求较低；在这句话里，它是报告给出的下降原因 |
 
-- 三条都返回 `"mode":"demo"`；
-- 其余任何「选词 + 原句」组合都返回 **422 `DEMO_UNSUPPORTED`**（不是 400）；
-- 匹配规则：`selection` 与 `sentence` 先去掉**首尾空白**（含制表符、全角空格），再与上表逐字比较，必须完全一致（区分大小写）；句内空格不会被折叠，例如原句里多打一个空格后 `lower demand` 就不再是连续原文。所以句尾多打空格无碍，但句中标点被改动、大小写被转换、句子被改写都会落到 422。客户端请回传从原文取到的那一段文本，不要重新拼接或翻译；
-- demo 模式下客户端面板应标注「演示释义」，避免用户误当成真实模型结果。
+- 三条都返回 `"mode":"demo"`、`"contextual":true`，并带音标、词性、原形与 `cetLevel`；
+- 三条精调样例以外的「选词 + 原句」组合，会先查内置四六级高频词表：命中就返回 `200`、`"contextual":false` 的通用词典释义（并支持常见词尾还原原形，如 `students → student`、`closes → close`），**不再抛 422**；只有词表里也没有的选词才返回 **422 `DEMO_UNSUPPORTED`**（不是 400）；
+- 匹配规则：`selection` 与 `sentence` 先去掉**首尾空白**（含制表符、全角空格），再与上表逐字比较，必须完全一致（区分大小写）；句内空格不会被折叠，例如原句里多打一个空格后 `lower demand` 就不再是连续原文。所以句尾多打空格无碍，但句中标点被改动、大小写被转换、句子被改写都会走「词表兜底 → 422」的路径。客户端请回传从原文取到的那一段文本，不要重新拼接或翻译；
+- demo 模式下客户端面板应标注「演示释义」，避免用户误当成真实模型结果；`contextual:false` 时建议再标注「词典释义（未结合本句）」。
 
 ### 8.2 live
 
 - 上游地址：`{CET_MODEL_BASE_URL}/chat/completions`（基地址末尾的 `/` 会被自动去掉；请求体里的 `model` 取 `CET_MODEL_NAME`）；
 - 请求头带 `Authorization: Bearer <CET_MODEL_API_KEY>`；
-- 服务端组装请求：`system` 提示词要求模型只输出 `{"meaning":"中文短释义","explanation":"结合原句的中文用法解释"}`，`user` 内容为「原句：…\n选词：…」；`temperature` 为 `0.2`，`max_tokens` 为 `512`。原句与选词被当作**待分析材料**，其中出现的指令不会被执行；
-- 服务端对上游返回做校验：`choices[0].message.content` 必须是非空白文本；允许被 \`\`\`json 代码块包裹；解析出的 `meaning`、`explanation` 必须非空（首尾空白会被去掉）。校验通过后返回 `"mode":"live"`；
+- 服务端组装请求：`system` 提示词要求模型只输出 `{"meaning":"中文短释义","explanation":"结合原句的中文用法解释","phonetic":"音标","partOfSpeech":"词性","lemma":"原形","cetLevel":"CET-4/CET-6"}`，`user` 内容为「原句：…\n选词：…」；`temperature` 为 `0.2`，`max_tokens` 为 `512`。原句与选词被当作**待分析材料**，其中出现的指令不会被执行；
+- 服务端对上游返回做校验：`choices[0].message.content` 必须是非空白文本；允许被 \`\`\`json 代码块包裹；解析出的 `meaning`、`explanation` 必须非空（首尾空白会被去掉）。`phonetic` / `partOfSpeech` / `lemma` / `cetLevel` 为**可选**：模型没给或 `cetLevel` 不是 `CET-4`/`CET-6` 时对应字段省略，不影响成功响应；校验通过后返回 `"mode":"live"`、`"contextual":true`；
 - **整句分析（`/api/v1/sentence-analyses`）复用同一套上游配置**：同一个基地址、模型名、密钥与超时；`system` 提示词要求模型只输出 `{"translation":"中文翻译","structure":"主干概括","chunks":[{"text":"原句中的连续片段","role":"语法作用","explanation":"怎样理解"}]}`，`user` 内容为「原句：…」，`temperature` 为 `0.2`，`max_tokens` 为 `1024`；
 - 整句分析的返回校验（任何一项不满足都返回 `502 MODEL_ERROR`，不把半成品或空结果交给前端）：`choices[0].message.content` 必须是非空白文本（允许被 \`\`\`json 代码块包裹）；`translation`、`structure` 必须非空（去掉首尾空白，各不超过 2000 字符）；`chunks` 必须是非空数组且最多 20 条；每条必须含非空的 `text`/`role`/`explanation`，`text` 不超过 300 字符**且必须是原句中的连续原文**；
 - 整句分析的片段顺序：服务端**优先按上游给出的顺序**，从上一段结束位置向后逐段匹配，全部命中就原样返回（每段的 `role`、`explanation` 与它对应的文本一起保留）。这样同一句里出现两次相同标记（例如 `They said that practice matters and that patience helps.` 里的两个 `that`）时，两段各自落在自己那次出现上，不会被误判；
@@ -1700,6 +1778,7 @@ echo "### 完成。若各步状态码与注释一致，说明账号、会话、�
 - 提示的返回校验（不满足即 `502`）：所选类型的字段必须存在且非空；每项 `source` 必须是中文原文中的**连续原文**、`expressions` 必须是**字符串数组**且非空（最多 5 个，元素为 `null` 或数字一律按格式错误处理）、`note` 非空；结构提示的 `mainClause` 非空，`clauses` 与 `connectives` 至少一项非空，片段同样必须逐字出自原文；关键词/短语最多 10 项，分句/连接方式最多 8 项；
 - 批改的 `system` 提示词要求只输出 `{"overallFeedback":…,"issues":[…]}`，`max_tokens` 为 `1024`；`user` 内容为「中文原文：…\n学生译文：…」；提示词明确「意思准确、表达自然的译文允许返回空 `issues`」「接受合理不同译法，不要为差异挑错」；
 - 批改的返回校验（不满足即 `502`）：`overallFeedback` 非空；`issues` 必须是数组（可为空）、最多 20 条；每条 `type` 只能是 `OMISSION` / `UNNATURAL`，`detail`、`suggestion` 非空，`quote` 不超过 200 字符，且 **`OMISSION` 的 `quote` 必须逐字出现在中文原文里、`UNNATURAL` 的 `quote` 必须逐字出现在学生译文里**；引用对不上直接判为格式错误，不把不可核对的引用交给前端；
+- 批改的评分字段（`estimatedScore` / `scoreMax` / `scoreBand` / `referenceTranslation`）为**可选**：只接受 0–15 的整数分与非空短文本，缺失、类型不符或越界一律按「未返回」处理（字段省略），**绝不因此让整次批改失败**；写作批改同理（`estimatedScore` / `scoreMax` / `scoreBand`）；
 - 汉译英两个接口的 `quote`/`source` 校验与 demo 内置数据共用同一套规则（`TranslationRules`），demo 数据写错会让服务启动失败；
 - 失败映射：
 
@@ -1811,16 +1890,17 @@ cd server
 - 用例覆盖（清单如下；具体断言以 `src/test/java` 下的实现为准，运行结果见第 12 节）：
   - 注册与登录：用户名/密码规则、重复注册 409、并发注册同一用户名只成功一个、用户名不存在与口令错误返回完全相同的 401、口令不明文回显；
   - 会话：`/me` 取身份、退出后旧凭证 401、其他账号凭证不受影响、凭证过期（用可拨动的测试时钟推进时间，不实际等待）、伪造凭证 401；
-  - 释义 demo：三条内置示例（含同一 `decline` 两种语境）、内置 `explanation` 文案逐字锁定、未收录 422、选词不在原句 400、空白/缺失/非法 JSON 400、退出后查词 401；
+  - 释义 demo：三条内置示例（含同一 `decline` 两种语境）、内置 `explanation` 文案逐字锁定、词表兜底（任意句子中的常用词返回 `contextual=false`，复数/过去式还原原形）、词表外生词 422、选词不在原句 400、空白/缺失/非法 JSON 400、退出后查词 401；
+  - 健康检查：`GET /api/v1/health` 匿名可访问、固定 `status/mode/version` 三字段、伪造凭证仍 200、成功体不含账号或凭证；live 模式由 `ExplainLiveApiTest` 断言 `mode=live` 与扩展字段透传；
   - 输入规范化与类型：`selection`/`sentence` 的 ASCII 空格、制表符、全角空格、换行都先去首尾再校验，句内空格不被折叠（双空格导致选词不再连续则 400）；`password`/`username`/`selection`/`sentence` 传数字、小数、布尔值一律 400，而字符串形态的纯数字口令照常可用；
   - 释义 live：用本地假上游 `FakeOpenAiServer` 覆盖成功、上游 500、不可解析内容、读超时，分别断言 200/`mode=live`、502、502、504，并断言响应不含上游正文字符串、密钥与堆栈；
   - 整句分析 demo：内置文章两句 + 含从句长句的固定拆解（片段按原句顺序、逐字摘自原句、字段形状、译文与主干为中文）、长句指出主句主干、未收录句子 422、空白/缺失/类型错误/超长/非法 JSON 400、首尾空白规范化、退出后 401、成功体不泄露凭证；
   - 整句分析 live（假上游）：成功返回 `mode=live`、片段顺序被写反时服务端重排、片段不在原句中 502、片段缺字段 502、`chunks` 为空 502、上游 500 502、不可解析 502、读超时 504、鉴权与入参校验先于上游调用、首尾空白在调上游前去掉；
   - 片段定位规则（纯逻辑单测）：重复标记按上游顺序各自定位且 `role`/`explanation` 不互换、无歧义乱序仍被纠正、原句只有一个标记却给两次 502、确实重叠 502、原文找不到 502；
   - 汉译英提示 demo：三类提示各自只返回本类型字段、中文片段逐字出自原文、不返回整段参考译文、`hintType` 非法与原文缺失/超长 400、未收录材料 422、首尾空白规范化、退出后 401；
-  - 汉译英批改 demo：草稿 3 条问题（`OMISSION`「对高校毕业生」「越来越」+ `UNNATURAL` `have good team cooperation`，引用逐字可查且依据互相独立）、补全并改顺后 0 条且草稿的漏译引用不再出现、准确译文与另一种合理译法都返回空列表但反馈不同、未收录与「改一个词」的近似译文 422、各类非法输入 400；
-  - 汉译英 live（假上游）：三类提示成功返回 `mode=live`、`expressions` 含 `null`/数字时 keyword 与 phrase 都是 502（不再 500）、合法字符串仍 200、所选类型字段缺失/中文片段不在原文/空结果/非 JSON 502、批改空问题列表与带引用问题逐条透传、乱序引用（「明天」在前「今天」在后）仍 200 且可逐条独立定位、同一引文重复出现仍 200、漏译引用不在原文 502、表达不自然引用不在学生译文 502、缺 `overallFeedback`/`issues` 非数组 502、上游 500 502、读超时 504、鉴权与入参校验先于上游调用、首尾空白在调上游前去掉；
-  - 写作批改 demo 覆盖两稿差异、原文引用、练习关联、演示范围、请求校验和学生鉴权。Live 使用模拟上游覆盖自选题、空问题列表、返回字段校验、精确引用、练习关联及 502/504。
+  - 汉译英批改 demo：草稿 3 条问题（`OMISSION`「对高校毕业生」「越来越」+ `UNNATURAL` `have good team cooperation`，引用逐字可查且依据互相独立）、补全并改顺后 0 条且草稿的漏译引用不再出现、准确译文与另一种合理译法都返回空列表但反馈不同、预估分随质量递增（9 / 12 / 14）、`scoreMax=15`、档位与参考译文非空、未收录与「改一个词」的近似译文 422、各类非法输入 400；
+  - 汉译英 live（假上游）：三类提示成功返回 `mode=live`、`expressions` 含 `null`/数字时 keyword 与 phrase 都是 502（不再 500）、合法字符串仍 200、所选类型字段缺失/中文片段不在原文/空结果/非 JSON 502、批改空问题列表与带引用问题逐条透传、乱序引用（「明天」在前「今天」在后）仍 200 且可逐条独立定位、同一引文重复出现仍 200、漏译引用不在原文 502、表达不自然引用不在学生译文 502、缺 `overallFeedback`/`issues` 非数组 502、评分字段有则透传无则省略、上游 500 502、读超时 504、鉴权与入参校验先于上游调用、首尾空白在调上游前去掉；
+  - 写作批改 demo 覆盖两稿差异、原文引用、练习关联、预估分（10 / 14）、演示范围、请求校验和学生鉴权。Live 使用模拟上游覆盖自选题、空问题列表、评分字段可选透传、返回字段校验、精确引用、练习关联及 502/504。
   - 写作练习判答与复测覆盖原问题与题面传递、合理表达与部分正确答案、换情境出题、三种判定与精确引用、演示范围、鉴权、输入校验和模拟上游 502/504。
   - 持久化：重启后账号仍可登录、旧凭证在有效期内仍有效。
 
@@ -1831,7 +1911,7 @@ cd server
 ./mvnw test -Dtest=ExplainDemoApiTest
 ```
 
-`./mvnw -o -B verify` 仍是原有的 **180 项**回归，测试用独立的内存库/临时文件库和环回端口，不读写 `server/data/`。live 冒烟不塞进 Maven 用例（避免让构建依赖 Python 和另起 jar），单独按 [3.3.1](#331-live-冒烟入口契约检查与人工判断分开) 运行；两者都通过才说明「契约 + live 链路」可用，真实模型的教学质量仍需人工判断。
+`./mvnw -o -B verify` 当前为 **194 项**回归（0.2.0 起新增健康检查、词表兜底与评分字段用例），测试用独立的内存库/临时文件库和环回端口，不读写 `server/data/`。live 冒烟不塞进 Maven 用例（避免让构建依赖 Python 和另起 jar），单独按 [3.3.1](#331-live-冒烟入口契约检查与人工判断分开) 运行；两者都通过才说明「契约 + live 链路」可用，真实模型的教学质量仍需人工判断。
 
 测试代码位置：
 
@@ -1846,10 +1926,13 @@ server/src/test/java/com/cethelper/server/
 │   ├── StrictJsonTypeApiTest.java         # 数字/布尔值不能被当成字符串口令
 │   └── AuthContractAssertions.java        # auth 用例共用的 HTTP 契约断言
 ├── explain/
-│   ├── ExplainDemoApiTest.java            # demo 三例、400/422、匿名 401、退出后 401
+│   ├── ExplainDemoApiTest.java            # demo 三例、词表兜底、400/422、匿名 401、退出后 401
 │   ├── DemoExplanationTextApiTest.java    # 内置解释文案逐字锁定
+│   ├── DemoExplanationWordFallbackApiTest.java  # 词表兜底：contextual=false、词尾还原、词表外 422
 │   ├── ExplanationInputNormalizationApiTest.java  # 首尾空白规范化 + 字段类型校验
-│   └── ExplainLiveApiTest.java            # live 假上游：成功 / 502 / 502 / 504 + 输入规范化
+│   └── ExplainLiveApiTest.java            # live 假上游：成功 / 扩展字段透传 / 健康探测 / 502 / 504 + 输入规范化
+├── common/
+│   └── HealthApiTest.java                 # GET /api/v1/health：匿名可用、固定三字段、不泄露凭证
 ├── sentence/
 │   ├── SentenceAnalysisDemoApiTest.java   # 内置两句 + 含从句长句、片段顺序、400/422、匿名 401、退出后 401
 │   ├── SentenceAnalysisLiveApiTest.java   # live 假上游：成功 / 双 that / 片段重排 / 片段不符 / 空结果 / 502 / 504
@@ -1963,7 +2046,7 @@ server/src/test/resources/application-test.yml   # 测试专用内存库配置
 | 错误密码 401 | 口令改错 / 账号不存在 | 均 `401`，错误体逐字相同 `{"code":"INVALID_CREDENTIALS","message":"用户名或密码不正确。"}` | 通过 |
 | 匿名 / 无效凭证 401 | 不带 Authorization、伪造 token、`Basic` 方案、超长口令登录 | `401`；超长（100 字符）口令按凭据错误处理，不会 500 | 通过 |
 | 选词不在原句 400 | `{"selection":"decline","sentence":"The report attributed the increase to higher demand."}` | `400`，`{"code":"INVALID_INPUT","message":"选词必须是原句中的连续原文。"}` | 通过 |
-| 未收录 422 | demo 下查 `invitation` | `422`，`{"code":"DEMO_UNSUPPORTED",...}` | 通过 |
+| 未收录 422 | demo 下查词表外生词（如 `quizzacious`） | `422`，`{"code":"DEMO_UNSUPPORTED",...}`；注：0.2.0 起 `invitation` 等常用词已由内置词表兜底返回 `200`（`contextual=false`） | 通过 |
 | live 假上游 502 / 504 | `ExplainLiveApiTest`（本地 `HttpServer` 替身） | 上游 500 → `502 MODEL_ERROR`；content 非 JSON → `502`；响应慢于 400ms 读超时 → `504 MODEL_TIMEOUT`；错误体不含替身诱饵密钥 `sk-UPSTREAM-...`、上游正文与堆栈 | 通过 |
 | live 缺配置的启动校验 | `CET_EXPLANATION_MODE=live` 且不设三个 `CET_MODEL_*` | 进程退出码 1，日志给出中文提示「live 模式缺少配置：请设置 CET_MODEL_BASE_URL、CET_MODEL_NAME 与 CET_MODEL_API_KEY……」 | 通过 |
 | 日志脱敏 | 扫描两次运行日志 | 未出现明文口令、完整 `accessToken`、`sk-` 形态密钥；错误响应不含堆栈 | 通过 |
@@ -2014,3 +2097,15 @@ server/src/test/resources/application-test.yml   # 测试专用内存库配置
 
 > 本轮只新增 `server/scripts/live_smoke.py` 与 README 说明；未改 `android/`、未新增后端接口或存储、未改认证/401/API，也未执行 git init 或提交。
 
+
+### 12.4 词表兜底、评分档位与健康探测实测（2026-11-21）
+
+使用 Amazon Corretto 21.0.13.1（`$HOME/cet-tools/amazon-corretto-21.jdk/Contents/Home`）、Maven Wrapper 3.9.16、离线模式 `./mvnw -o test`。
+
+| 验证方式 | 实测结果 |
+|---|---|
+| 全量回归 | `Tests run: 194, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`。本轮新增：`HealthApiTest` 3 项、`DemoExplanationWordFallbackApiTest` 4 项、`ExplainLiveApiTest` 扩展字段/健康探测 3 项、翻译 demo 评分 1 项、翻译 live 可选评分 1 项、写作 demo 评分 1 项、写作 live 可选评分 1 项。 |
+| 健康探测 | `GET /api/v1/health` 匿名 `200`，响应固定 `{"status":"UP","mode":"demo","version":"0.2.0"}`；伪造凭证仍 `200`；live 配置下 `mode=live`（`ExplainLiveApiTest`）。`SecurityConfig` 已单独放行该 GET。 |
+| 词表兜底 | 非精调句中查 `decline`、`bookstore`、`the` 等常用词返回 `200`、`contextual=false`，并带 `phonetic`/`partOfSpeech`/`lemma`/`cetLevel`；`students → student`、`closes → close` 能还原原形；词表外生词（如 `quizzacious`）仍 `422 DEMO_UNSUPPORTED`。 |
+| 评分与参考译文 | demo 汉译英：草稿 9、补全稿 12、准确/另一种译法 14，`scoreMax=15`，`scoreBand` 与参考译文非空；demo 写作：草稿 10、修订稿 14。live 模型未返回评分时字段省略（JSON 中不出现），返回时原样透传，均不影响成功响应。 |
+| 兼容性 | 五个释义新增字段与四个批改新增字段全部 `@JsonInclude(NON_NULL)`，未返回时不出现；旧断言「恰好三字段/五字段」的场景已同步更新为契约全字段集合。 |

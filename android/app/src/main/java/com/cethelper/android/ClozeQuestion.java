@@ -8,7 +8,7 @@ record ClozeQuestion(ReadingArticle article, Favorite favorite, String prompt, S
     private static final String SPACES = "[\\s\\p{Zs}]+";
 
     static ClozeQuestion from(ReadingArticle article, Favorite favorite) {
-        if (article == null || !article.id().equals(favorite.articleId)) {
+        if (article == null || favorite == null || !article.id().equals(favorite.articleId)) {
             return null;
         }
 
@@ -41,6 +41,34 @@ record ClozeQuestion(ReadingArticle article, Favorite favorite, String prompt, S
         String prompt = sentence.substring(0, start - sentenceStart)
                 + BLANK + sentence.substring(end - sentenceStart);
         return new ClozeQuestion(article, favorite, prompt, maskTitle(article.title(), favorite.selection));
+    }
+
+    static String buildHint(String selection) {
+        if (selection == null) {
+            return "";
+        }
+        String trimmed = ReadingArticle.trimSpace(selection);
+        if (trimmed.isEmpty()) {
+            return "";
+        }
+        String[] parts = trimmed.split(SPACES);
+        StringJoiner masked = new StringJoiner("   ");
+        StringJoiner lengths = new StringJoiner("+");
+        for (String part : parts) {
+            if (part.isEmpty()) {
+                continue;
+            }
+            StringBuilder word = new StringBuilder();
+            int codePointCount = part.codePointCount(0, part.length());
+            int firstEnd = part.offsetByCodePoints(0, 1);
+            word.append(part, 0, firstEnd);
+            for (int i = 1; i < codePointCount; i++) {
+                word.append(" _");
+            }
+            masked.add(word.toString());
+            lengths.add(Integer.toString(codePointCount));
+        }
+        return masked + " (" + lengths + ")";
     }
 
     private static String maskTitle(String title, String answer) {

@@ -11,8 +11,9 @@ final class TranslationPractice {
 
     private final ApiClient api;
     private final String token;
-    private final ArticleOwner owner;
+    final ArticleOwner owner;
     private final DraftStore drafts;
+    private final Consumer<PracticeRecord> onRecordSaved;
 
     String sourceInput;
     String source = "";
@@ -24,12 +25,31 @@ final class TranslationPractice {
     Consumer<PracticeRequest<?>> onChanged;
 
     TranslationPractice(ExecutorService executor, ArticleOwner owner, String token, DraftStore drafts) {
-        hint = new PracticeRequest<>(executor, this::notifyChanged);
-        review = new PracticeRequest<>(executor, this::notifyChanged);
+        this(executor, owner, token, drafts, null);
+    }
+
+    TranslationPractice(ExecutorService executor, ArticleOwner owner, String token, DraftStore drafts,
+                        Consumer<PracticeRecord> onRecordSaved) {
         this.api = new ApiClient(owner.serverUrl());
         this.token = token;
         this.owner = owner;
         this.drafts = drafts;
+        this.onRecordSaved = onRecordSaved;
+        hint = new PracticeRequest<>(executor, this::notifyChanged);
+        review = new PracticeRequest<>(executor, completed -> {
+            if (completed.value != null && this.onRecordSaved != null
+                    && completed.value.rawJson() != null && !completed.value.rawJson().isEmpty()) {
+                this.onRecordSaved.accept(new PracticeRecord(
+                        PracticeRecord.ownerKey(owner),
+                        PracticeRecord.TYPE_TRANSLATION,
+                        completed.value.source(),
+                        completed.value.submittedDraft(),
+                        completed.value.rawJson(),
+                        completed.value.estimatedScore(),
+                        System.currentTimeMillis()));
+            }
+            notifyChanged(completed);
+        });
         DraftStore.Translation saved = drafts.translation(owner);
         sourceInput = saved.source();
         draft = saved.draft();
@@ -49,18 +69,28 @@ final class TranslationPractice {
         answering = true;
     }
 
+    void restoreFromRecord(String savedSource, String savedDraft, TranslationFeedback.Review savedReview) {
+        resetResponses();
+        sourceInput = savedSource;
+        source = savedSource;
+        draft = savedDraft;
+        answering = true;
+        review.value = savedReview;
+        drafts.saveTranslation(owner, sourceInput, draft, true);
+    }
+
     boolean hasInput() {
         return !sourceInput.isEmpty() || !draft.isEmpty();
     }
 
     void setSourceInput(String text) {
         sourceInput = text;
-        saveInputs();
+        saveInputs(false);
     }
 
     void setDraft(String text) {
         draft = text;
-        saveInputs();
+        saveInputs(false);
     }
 
     void replace(String text) {
@@ -68,11 +98,11 @@ final class TranslationPractice {
         source = "";
         sourceInput = text;
         draft = "";
-        saveInputs();
+        saveInputs(true);
     }
 
-    private void saveInputs() {
-        drafts.saveTranslation(owner, sourceInput, draft);
+    private void saveInputs(boolean immediate) {
+        drafts.saveTranslation(owner, sourceInput, draft, immediate);
     }
 
     void loadHint(TranslationFeedback.HintType type) {
@@ -82,6 +112,7 @@ final class TranslationPractice {
     }
 
     void submit(String submittedDraft) {
+        drafts.flush();
         String input = source;
         review.start(() -> api.translationReview(token, input, submittedDraft));
     }

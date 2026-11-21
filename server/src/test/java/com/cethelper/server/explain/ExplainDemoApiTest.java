@@ -35,6 +35,15 @@ class ExplainDemoApiTest {
     /** 与内置示例同结构但把 decline 换成 increase 的句子：合法英文，但 "decline" 不是它的子串。 */
     private static final String SENTENCE_WITHOUT_DECLINE = "The report attributed the increase to higher demand.";
 
+    /** 成功体的完整字段集：原有 3 个字段 + 本轮新增的 5 个可选字段。 */
+    private static final List<String> EXPLANATION_FIELDS = List.of(
+            "meaning", "explanation", "mode", "phonetic", "partOfSpeech", "lemma", "cetLevel", "contextual");
+
+    /** 内置四六级词表当然覆盖不到的词，用于验证「合法但未收录」仍返回 422。 */
+    private static final String UNKNOWN_WORD = "zzquux";
+    private static final String SENTENCE_WITH_UNKNOWN_WORD = "This sentence contains " + UNKNOWN_WORD
+            + ", which is not in the built-in vocabulary.";
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -102,9 +111,10 @@ class ExplainDemoApiTest {
     @Test
     @DisplayName("demo 未收录但合法的组合返回 422 DEMO_UNSUPPORTED")
     void unsupportedCombinationReturnsDemoUnsupported() throws Exception {
-        // "invitation" 确实是第二句的连续子串，只是不在内置示例表里，属于「合法但未收录」。
+        // 选词确实是原句的连续子串，也不在内置四六级词表里，属于「合法但未收录」。
+        // 注意：内置示例句里的 invitation / students 等词已由词表兜底，因此这里改用词表外的生僻串。
         MvcResult result = ApiTestSupport
-                .explain(mockMvc, student.token(), "invitation", ApiTestSupport.SENTENCE_DECLINE_VERB)
+                .explain(mockMvc, student.token(), UNKNOWN_WORD, SENTENCE_WITH_UNKNOWN_WORD)
                 .andExpect(status().isUnprocessableEntity())
                 .andReturn();
         assertErrorBody(result, "DEMO_UNSUPPORTED");
@@ -162,7 +172,7 @@ class ExplainDemoApiTest {
     }
 
     @Test
-    @DisplayName("成功响应体只含 meaning/explanation/mode，不泄露口令或凭证")
+    @DisplayName("成功响应体含约定字段，不泄露口令或凭证")
     void successBodyDoesNotExposeCredentials() throws Exception {
         MvcResult result = ApiTestSupport
                 .explain(mockMvc, student.token(), "decline", ApiTestSupport.SENTENCE_DECLINE_VERB)
@@ -171,8 +181,8 @@ class ExplainDemoApiTest {
         JsonNode json = ApiTestSupport.body(result);
 
         assertThat(fieldNames(json))
-                .as("成功体必须恰好是契约约定的三个字段")
-                .containsExactlyInAnyOrder("meaning", "explanation", "mode");
+                .as("成功体必须恰好是契约约定的字段")
+                .containsExactlyInAnyOrderElementsOf(EXPLANATION_FIELDS);
         assertThat(json.has("password")).isFalse();
         assertThat(json.has("token")).isFalse();
         assertThat(json.has("accessToken")).isFalse();
@@ -190,12 +200,19 @@ class ExplainDemoApiTest {
         JsonNode json = ApiTestSupport.body(result);
 
         assertThat(fieldNames(json))
-                .as("成功体必须恰好是契约约定的三个字段")
-                .containsExactlyInAnyOrder("meaning", "explanation", "mode");
+                .as("成功体必须恰好是契约约定的字段")
+                .containsExactlyInAnyOrderElementsOf(EXPLANATION_FIELDS);
         assertThat(json.get("meaning").asText())
                 .as("选词 %s 在 %s 中的释义", selection, sentence)
                 .isEqualTo(expectedMeaning);
         assertThat(json.get("mode").asText()).as("demo 模式下 mode 必须为 demo").isEqualTo("demo");
+        assertThat(json.get("contextual").asBoolean())
+                .as("精确命中的三条精调样例必须是语境释义")
+                .isTrue();
+        assertThat(json.get("phonetic").asText()).startsWith("/");
+        assertThat(json.get("partOfSpeech").asText()).isNotBlank();
+        assertThat(json.get("lemma").asText()).isNotBlank();
+        assertThat(json.get("cetLevel").asText()).isEqualTo("CET-4");
 
         String explanation = json.get("explanation").asText();
         assertThat(explanation).as("explanation 不能为空").isNotBlank();

@@ -1,90 +1,341 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/translation_scroll" android:layout_width="match_parent"
-    android:layout_height="match_parent" android:fillViewport="true">
+    android:id="@+id/translation_scroll"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
 
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="vertical" android:padding="24dp" android:focusableInTouchMode="true">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:focusableInTouchMode="true"
+        android:orientation="vertical"
+        android:paddingStart="20dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="28dp">
 
-        <Button android:id="@+id/translation_edit_source" style="@style/StudyTextButton"
-            android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="@string/translation_edit_source" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-        <TextView style="@style/StudyHeading" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:layout_marginTop="8dp"
+            <Button
+                android:id="@+id/translation_edit_source"
+                style="@style/StudyTextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:drawableStart="@drawable/ic_back"
+                android:drawablePadding="4dp"
+                android:minWidth="0dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="10dp"
+                android:text="@string/translation_edit_source" />
+
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <Button
+                android:id="@+id/translation_history_button"
+                style="@style/StudyTextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:drawableStart="@drawable/ic_history"
+                android:drawablePadding="4dp"
+                android:minWidth="0dp"
+                android:paddingStart="8dp"
+                android:paddingEnd="4dp"
+                android:text="@string/translation_history" />
+        </LinearLayout>
+
+        <TextView
+            style="@style/StudyHeading"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
             android:text="@string/translation_title" />
 
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="14dp" android:background="@drawable/card"
-            android:padding="16dp" android:orientation="vertical">
-            <TextView style="@style/StudyCaption" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:text="@string/translation_source" />
-            <TextView android:id="@+id/translation_original" style="@style/StudyCaption"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:layout_marginTop="6dp" android:textSize="17sp"
-                android:textColor="@color/ink" android:textIsSelectable="true" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/card"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                style="@style/StudyBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/translation_source" />
+
+            <TextView
+                android:id="@+id/translation_original"
+                style="@style/StudyCaption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:lineSpacingExtra="4dp"
+                android:textColor="@color/ink"
+                android:textIsSelectable="true"
+                android:textSize="17sp" />
         </LinearLayout>
 
-        <TextView style="@style/StudyCaption" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:layout_marginTop="18dp"
-            android:labelFor="@id/translation_draft" android:text="@string/translation_draft" />
-        <EditText android:id="@+id/translation_draft" style="@style/StudyField"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/StudyCaption"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="sans-serif-medium"
+                android:labelFor="@id/translation_draft"
+                android:text="@string/translation_draft" />
+
+            <TextView
+                android:id="@+id/translation_word_count"
+                style="@style/StudyBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/word_count_initial" />
+        </LinearLayout>
+
+        <EditText
+            android:id="@+id/translation_draft"
+            style="@style/StudyField"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:paddingTop="14dp" android:paddingBottom="14dp" android:gravity="top|start"
+            android:gravity="top|start"
+            android:importantForAutofill="no"
             android:inputType="textMultiLine|textCapSentences"
-            android:minLines="5" android:saveEnabled="false" android:importantForAutofill="no" />
+            android:minLines="5"
+            android:paddingTop="14dp"
+            android:paddingBottom="14dp"
+            android:saveEnabled="false" />
 
-        <Button android:id="@+id/translation_submit" style="@style/StudyPrimaryButton"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="10dp" android:text="@string/translation_submit" />
+        <Button
+            android:id="@+id/translation_submit"
+            style="@style/StudyPrimaryButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/translation_submit" />
 
-        <LinearLayout android:id="@+id/translation_review_panel"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="20dp" android:background="@drawable/card"
-            android:orientation="vertical" android:padding="16dp" android:visibility="gone">
-            <TextView android:id="@+id/translation_review_heading" style="@style/StudyHeading"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="@string/translation_review_heading" android:textSize="22sp" />
-            <TextView android:id="@+id/translation_review_status" style="@style/StudyCaption"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:layout_marginTop="6dp" android:accessibilityLiveRegion="polite" />
-            <TextView android:id="@+id/translation_edited" style="@style/StudyCaption"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:layout_marginTop="6dp" android:visibility="gone"
-                android:text="@string/translation_edited" />
-            <LinearLayout android:id="@+id/translation_issues" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:orientation="vertical" />
-            <Button android:id="@+id/translation_retry_review" style="@style/StudyTextButton"
-                android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="@string/retry" android:visibility="gone" />
-            <Button android:id="@+id/translation_edit_draft" style="@style/StudyTextButton"
-                android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="@string/translation_edit_draft" android:visibility="gone" />
+        <LinearLayout
+            android:id="@+id/translation_review_panel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/card"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/translation_review_heading"
+                style="@style/StudyHeading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/translation_review_heading"
+                android:textSize="22sp" />
+
+            <LinearLayout
+                android:id="@+id/translation_score_card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/stat_card"
+                android:orientation="vertical"
+                android:padding="14dp"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        style="@style/StudyCaption"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:fontFamily="sans-serif-medium"
+                        android:text="@string/estimated_score_label"
+                        android:textColor="@color/accent" />
+
+                    <TextView
+                        android:id="@+id/translation_score_value"
+                        style="@style/StudyStatValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="22sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/translation_score_band"
+                    style="@style/StudyCaption"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="@color/ink" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/translation_review_status"
+                style="@style/StudyCaption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:accessibilityLiveRegion="polite" />
+
+            <TextView
+                android:id="@+id/translation_edited"
+                style="@style/StudyCaption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/tone_card"
+                android:padding="8dp"
+                android:text="@string/translation_edited"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/translation_reference_card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/tone_card"
+                android:orientation="vertical"
+                android:padding="12dp"
+                android:visibility="gone">
+
+                <TextView
+                    style="@style/StudyBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/reference_translation_label" />
+
+                <TextView
+                    android:id="@+id/translation_reference_text"
+                    style="@style/StudyCaption"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="@color/ink"
+                    android:textDirection="ltr"
+                    android:textIsSelectable="true"
+                    android:textSize="15sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/translation_issues"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <Button
+                android:id="@+id/translation_retry_review"
+                style="@style/StudySecondaryButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/retry"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/translation_edit_draft"
+                style="@style/StudySecondaryButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/translation_edit_draft"
+                android:visibility="gone" />
         </LinearLayout>
 
-        <LinearLayout android:id="@+id/translation_hint_panel"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="20dp" android:background="@drawable/card"
-            android:orientation="vertical" android:padding="12dp">
-            <TextView style="@style/StudyCaption" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:text="@string/translation_hint_prompt" />
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        <LinearLayout
+            android:id="@+id/translation_hint_panel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/card"
+            android:orientation="vertical"
+            android:padding="14dp">
+
+            <TextView
+                style="@style/StudyCaption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:text="@string/translation_hint_prompt" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
                 android:orientation="horizontal">
-                <Button android:id="@+id/translation_keywords" style="@style/StudyTextButton"
-                    android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
-                    android:text="@string/translation_keywords" />
-                <Button android:id="@+id/translation_phrases" style="@style/StudyTextButton"
-                    android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
-                    android:text="@string/translation_phrases" />
-                <Button android:id="@+id/translation_structure" style="@style/StudyTextButton"
-                    android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
-                    android:text="@string/translation_structure" />
+
+                <Button
+                    android:id="@+id/translation_keywords"
+                    style="@style/StudySecondaryButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp"
+                    android:text="@string/translation_keywords"
+                    android:textSize="13sp" />
+
+                <Button
+                    android:id="@+id/translation_phrases"
+                    style="@style/StudySecondaryButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp"
+                    android:text="@string/translation_phrases"
+                    android:textSize="13sp" />
+
+                <Button
+                    android:id="@+id/translation_structure"
+                    style="@style/StudySecondaryButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp"
+                    android:text="@string/translation_structure"
+                    android:textSize="13sp" />
             </LinearLayout>
-            <TextView android:id="@+id/translation_hint_status" style="@style/StudyCaption"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:accessibilityLiveRegion="polite" android:visibility="gone" />
-            <LinearLayout android:id="@+id/translation_hint_items" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:orientation="vertical" />
+
+            <TextView
+                android:id="@+id/translation_hint_status"
+                style="@style/StudyCaption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:accessibilityLiveRegion="polite"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/translation_hint_items"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="vertical" />
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

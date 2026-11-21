@@ -1,85 +1,230 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="match_parent"
-    android:orientation="vertical" android:paddingStart="20dp" android:paddingEnd="20dp"
-    android:focusableInTouchMode="true">
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:focusableInTouchMode="true"
+    android:orientation="vertical"
+    android:paddingStart="20dp"
+    android:paddingEnd="20dp">
 
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="horizontal" android:gravity="center_vertical">
-        <Button android:id="@+id/cloze_back" style="@style/StudyTextButton"
-            android:layout_width="wrap_content" android:layout_height="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingTop="4dp">
+
+        <Button
+            android:id="@+id/cloze_back"
+            style="@style/StudyTextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:drawableStart="@drawable/ic_back"
+            android:drawablePadding="4dp"
+            android:minWidth="0dp"
+            android:paddingStart="4dp"
+            android:paddingEnd="10dp"
             android:text="@string/cloze_back" />
-        <Space android:layout_width="0dp" android:layout_weight="1" android:layout_height="1dp" />
-        <TextView android:id="@+id/cloze_progress" style="@style/StudyCaption"
-            android:layout_width="wrap_content" android:layout_height="wrap_content" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <TextView
+            android:id="@+id/cloze_progress"
+            style="@style/StudyBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
     </LinearLayout>
 
-    <ScrollView android:layout_width="match_parent" android:layout_height="0dp"
-        android:layout_weight="1" android:fillViewport="true">
+    <ProgressBar
+        android:id="@+id/cloze_progress_bar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="6dp"
+        android:layout_marginTop="4dp"
+        android:max="100"
+        android:progress="0"
+        android:progressDrawable="@drawable/progress_bar_bg" />
 
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:orientation="vertical" android:paddingBottom="24dp">
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
 
-            <TextView style="@style/StudyHeading" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:layout_marginTop="10dp"
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="24dp">
+
+            <TextView
+                style="@style/StudyHeading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
                 android:text="@string/cloze_start" />
 
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:layout_marginTop="18dp" android:orientation="vertical"
-                android:background="@drawable/card" android:padding="16dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/card"
+                android:orientation="vertical"
+                android:padding="18dp">
 
-                <TextView android:id="@+id/cloze_article" style="@style/StudyCaption"
-                    android:layout_width="match_parent" android:layout_height="wrap_content" />
-                <TextView android:id="@+id/cloze_prompt" android:layout_width="match_parent"
-                    android:layout_height="wrap_content" android:layout_marginTop="10dp"
-                    android:textColor="@color/ink" android:fontFamily="serif" android:textSize="23sp"
-                    android:textDirection="ltr" android:lineSpacingExtra="5dp" />
+                <TextView
+                    android:id="@+id/cloze_article"
+                    style="@style/StudyCaption"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/cloze_prompt"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:fontFamily="serif"
+                    android:lineSpacingExtra="6dp"
+                    android:textColor="@color/ink"
+                    android:textDirection="ltr"
+                    android:textSize="22sp" />
             </LinearLayout>
 
-            <LinearLayout android:id="@+id/cloze_entry" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:layout_marginTop="14dp"
+            <LinearLayout
+                android:id="@+id/cloze_entry"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
                 android:orientation="vertical">
 
-                <EditText android:id="@+id/cloze_input" style="@style/StudyField"
-                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                <EditText
+                    android:id="@+id/cloze_input"
+                    style="@style/StudyField"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
                     android:hint="@string/cloze_input_hint"
-                    android:importantForAutofill="no" android:saveEnabled="false"
-                    android:inputType="textVisiblePassword|textNoSuggestions"
                     android:imeOptions="actionDone|flagNoPersonalizedLearning|flagNoExtractUi"
+                    android:importantForAutofill="no"
+                    android:inputType="textVisiblePassword|textNoSuggestions"
+                    android:saveEnabled="false"
                     android:singleLine="true" />
-                <Button android:id="@+id/cloze_submit" style="@style/StudyPrimaryButton"
-                    android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp" android:text="@string/cloze_submit" />
-                <Button android:id="@+id/cloze_reveal" style="@style/StudyTextButton"
-                    android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:text="@string/cloze_reveal" />
+
+                <TextView
+                    android:id="@+id/cloze_hint_text"
+                    style="@style/StudyCaption"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/tone_card"
+                    android:fontFamily="monospace"
+                    android:padding="10dp"
+                    android:textColor="@color/accent"
+                    android:textSize="15sp"
+                    android:visibility="gone" />
+
+                <Button
+                    android:id="@+id/cloze_submit"
+                    style="@style/StudyPrimaryButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/cloze_submit" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/cloze_hint_button"
+                        style="@style/StudySecondaryButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:drawableStart="@drawable/ic_hint"
+                        android:drawablePadding="4dp"
+                        android:text="@string/cloze_hint" />
+
+                    <Button
+                        android:id="@+id/cloze_reveal"
+                        style="@style/StudySecondaryButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        android:text="@string/cloze_reveal" />
+                </LinearLayout>
             </LinearLayout>
 
-            <LinearLayout android:id="@+id/cloze_review" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:layout_marginTop="14dp"
-                android:orientation="vertical" android:visibility="gone">
+            <LinearLayout
+                android:id="@+id/cloze_review"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:orientation="vertical"
+                android:visibility="gone">
 
-                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:orientation="vertical" android:background="@drawable/card" android:padding="16dp">
-                    <TextView android:id="@+id/cloze_feedback" android:layout_width="match_parent"
-                        android:layout_height="wrap_content" android:textSize="16sp"
-                        android:textColor="@color/accent" android:fontFamily="sans-serif-medium"
-                        android:accessibilityLiveRegion="polite" />
-                    <TextView android:id="@+id/cloze_answer" android:layout_width="match_parent"
-                        android:layout_height="wrap_content" android:layout_marginTop="8dp"
-                        android:textSize="23sp" android:fontFamily="serif" android:textColor="@color/ink" />
-                    <TextView android:id="@+id/cloze_meaning" android:layout_width="match_parent"
-                        android:layout_height="wrap_content" android:layout_marginTop="4dp"
-                        android:textSize="16sp" android:textColor="@color/ink" />
-                    <TextView android:id="@+id/cloze_original" style="@style/StudyCaption"
-                        android:layout_width="match_parent" android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/card"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <TextView
+                        android:id="@+id/cloze_feedback"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:accessibilityLiveRegion="polite"
+                        android:fontFamily="sans-serif-medium"
+                        android:textColor="@color/accent"
+                        android:textSize="16sp" />
+
+                    <TextView
+                        android:id="@+id/cloze_answer"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:fontFamily="serif"
+                        android:textColor="@color/ink"
+                        android:textSize="23sp" />
+
+                    <TextView
+                        android:id="@+id/cloze_meaning"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textColor="@color/ink"
+                        android:textSize="16sp" />
+
+                    <TextView
+                        android:id="@+id/cloze_original"
+                        style="@style/StudyCaption"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:background="@drawable/tone_card"
+                        android:padding="10dp" />
                 </LinearLayout>
 
-                <Button android:id="@+id/cloze_next" style="@style/StudyPrimaryButton"
-                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                <Button
+                    android:id="@+id/cloze_next"
+                    style="@style/StudyPrimaryButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
                     android:layout_marginTop="12dp" />
-                <Button android:id="@+id/cloze_jump" style="@style/StudyTextButton"
-                    android:layout_width="match_parent" android:layout_height="wrap_content"
+
+                <Button
+                    android:id="@+id/cloze_jump"
+                    style="@style/StudySecondaryButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
                     android:text="@string/return_to_article" />
             </LinearLayout>
         </LinearLayout>

@@ -5,6 +5,7 @@ import android.content.Context;
 import android.text.Layout;
 import android.text.Spannable;
 import android.text.style.BackgroundColorSpan;
+import android.text.style.UnderlineSpan;
 import android.util.AttributeSet;
 import android.view.ActionMode;
 import android.view.GestureDetector;
@@ -14,6 +15,8 @@ import android.view.MotionEvent;
 import android.view.textclassifier.TextClassifier;
 import android.widget.TextView;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -25,9 +28,11 @@ public final class WordTextView extends TextView {
     }
 
     private static final int LOOKUP_ITEM = 1;
+    private static final int SAVED_HIGHLIGHT_COLOR = 0x22075B53;
     private static final Pattern WORD = Pattern.compile("\\p{L}[\\p{L}\\p{M}]*(?:['’‐‑-][\\p{L}\\p{M}]+)*");
 
     private final GestureDetector taps;
+    private final List<Object> savedSpans = new ArrayList<>();
     private OnLookup listener;
     private ActionMode selectionMode;
     private BackgroundColorSpan marker;
@@ -85,8 +90,40 @@ public final class WordTextView extends TextView {
     }
 
     void setParagraph(String sentence, OnLookup listener) {
+        savedSpans.clear();
+        marker = null;
         setText(sentence, BufferType.SPANNABLE);
         this.listener = listener;
+    }
+
+    void setSavedRanges(List<int[]> ranges) {
+        CharSequence current = getText();
+        if (!(current instanceof Spannable text)) {
+            return;
+        }
+        for (Object span : savedSpans) {
+            text.removeSpan(span);
+        }
+        savedSpans.clear();
+        if (ranges == null || ranges.isEmpty()) {
+            return;
+        }
+        int length = text.length();
+        for (int[] range : ranges) {
+            if (range == null || range.length < 2) {
+                continue;
+            }
+            int start = range[0];
+            int end = range[1];
+            if (start >= 0 && start < end && end <= length) {
+                UnderlineSpan underline = new UnderlineSpan();
+                BackgroundColorSpan tint = new BackgroundColorSpan(SAVED_HIGHLIGHT_COLOR);
+                text.setSpan(tint, start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                text.setSpan(underline, start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                savedSpans.add(tint);
+                savedSpans.add(underline);
+            }
+        }
     }
 
     void mark(int start, int end) {

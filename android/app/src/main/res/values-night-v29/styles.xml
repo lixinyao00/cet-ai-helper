@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.CetStudy" parent="Theme.CetStudy.Base">
+        <item name="android:navigationBarColor">@color/paper</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:forceDarkAllowed">false</item>
+    </style>
+</resources>

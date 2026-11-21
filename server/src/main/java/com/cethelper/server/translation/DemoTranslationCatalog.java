@@ -115,6 +115,13 @@ public class DemoTranslationCatalog {
     private static final String ALTERNATE_FEEDBACK = "另一种合理译法：名词化主语 The rapid growth ... has made ... "
             + "准确传达原文，capable of both ... 对应「既能……又能……」。译法不同但意思到位，无需修改。";
 
+    /** 四六级汉译英按 15 分制评分，档位说明与分数保持一致。 */
+    private static final int SCORE_MAX = 15;
+    private static final String DRAFT_SCORE_BAND = "第四档（7-9分）：基本表达原文意思，但有较多漏译与不地道搭配。";
+    private static final String COMPLETED_SCORE_BAND = "第二档（10-12分）：基本达意，无明显漏译，个别表达仍可更自然。";
+    private static final String ACCURATE_SCORE_BAND = "第一档（13-15分）：译文准确、表达流畅，结构与用词符合四六级要求。";
+    private static final String ALTERNATE_SCORE_BAND = "第一档（13-15分）：译法不同但准确自然，同样属于高分段。";
+
     private final List<TranslationHintResponse> hints;
     private final List<TranslationReviewResponse> reviews;
 
@@ -173,10 +180,10 @@ public class DemoTranslationCatalog {
 
     private static List<TranslationReviewResponse> buildReviews() {
         List<TranslationReviewResponse> built = List.of(
-                review(DRAFT_TRANSLATION, DRAFT_FEEDBACK, DRAFT_ISSUES),
-                review(COMPLETED_TRANSLATION, COMPLETED_FEEDBACK, List.of()),
-                review(ACCURATE_TRANSLATION, ACCURATE_FEEDBACK, List.of()),
-                review(ALTERNATE_TRANSLATION, ALTERNATE_FEEDBACK, List.of()));
+                review(DRAFT_TRANSLATION, DRAFT_FEEDBACK, DRAFT_ISSUES, 9, DRAFT_SCORE_BAND),
+                review(COMPLETED_TRANSLATION, COMPLETED_FEEDBACK, List.of(), 12, COMPLETED_SCORE_BAND),
+                review(ACCURATE_TRANSLATION, ACCURATE_FEEDBACK, List.of(), 14, ACCURATE_SCORE_BAND),
+                review(ALTERNATE_TRANSLATION, ALTERNATE_FEEDBACK, List.of(), 14, ALTERNATE_SCORE_BAND));
         // 译文不能重复：否则「不同译文不同批改」的演示会退化成同一份结果。
         Set<String> translations = new HashSet<>();
         for (TranslationReviewResponse review : built) {
@@ -193,12 +200,17 @@ public class DemoTranslationCatalog {
     }
 
     private static TranslationReviewResponse review(String studentTranslation, String overallFeedback,
-                                                    List<ReviewIssue> issues) {
+                                                    List<ReviewIssue> issues, int estimatedScore,
+                                                    String scoreBand) {
         return new TranslationReviewResponse(
                 SOURCE_TEXT,
                 studentTranslation,
                 TranslationRules.requireText(overallFeedback, "overallFeedback", TranslationRules.MAX_TEXT_LENGTH),
                 TranslationRules.requireIssues(SOURCE_TEXT, studentTranslation, issues),
-                "demo");
+                "demo",
+                estimatedScore,
+                SCORE_MAX,
+                scoreBand,
+                ACCURATE_TRANSLATION);
     }
 }

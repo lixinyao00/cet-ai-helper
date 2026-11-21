@@ -10,6 +10,8 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import java.util.function.Consumer;
+
 final class SentenceAnalysisPanel {
     private final ScrollView scroll;
     private final TextView original;
@@ -18,6 +20,8 @@ final class SentenceAnalysisPanel {
     private final View result;
     private final View retry;
     private final LinearLayout fragments;
+    private Consumer<String> onSpeak;
+    private String currentSentence = "";
 
     SentenceAnalysisPanel(ScrollView scroll) {
         this.scroll = scroll;
@@ -27,9 +31,19 @@ final class SentenceAnalysisPanel {
         result = scroll.findViewById(R.id.analysis_result);
         retry = scroll.findViewById(R.id.analysis_retry);
         fragments = scroll.findViewById(R.id.analysis_fragments);
+        original.setOnClickListener(v -> {
+            if (onSpeak != null && !currentSentence.isEmpty()) {
+                onSpeak.accept(currentSentence);
+            }
+        });
+    }
+
+    void setOnSpeak(Consumer<String> onSpeak) {
+        this.onSpeak = onSpeak;
     }
 
     void loading(String sentence) {
+        currentSentence = sentence == null ? "" : sentence;
         original.setText(sentence);
         mode.setVisibility(View.GONE);
         result.setVisibility(View.GONE);
@@ -49,12 +63,14 @@ final class SentenceAnalysisPanel {
     }
 
     void show(SentenceAnalysis analysis) {
+        currentSentence = analysis.sentence();
         original.setText(analysis.sentence());
         status.setVisibility(View.GONE);
         retry.setVisibility(View.GONE);
         mode.setVisibility("demo".equals(analysis.mode()) ? View.VISIBLE : View.GONE);
         scroll.<TextView>findViewById(R.id.analysis_translation).setText(analysis.translation());
         scroll.<TextView>findViewById(R.id.analysis_structure).setText(analysis.structure());
+        fragments.removeAllViews();
 
         LayoutInflater inflater = LayoutInflater.from(scroll.getContext());
         for (SentenceAnalysis.Fragment fragment : analysis.fragments()) {
