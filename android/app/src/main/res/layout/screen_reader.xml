@@ -252,25 +252,40 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
-            android:orientation="horizontal">
+            android:orientation="vertical">
 
-            <Button
-                android:id="@+id/panel_action"
-                style="@style/StudyPrimaryButton"
-                android:layout_width="0dp"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="6dp"
-                android:layout_weight="1"
-                android:visibility="gone" />
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/panel_action"
+                    style="@style/StudyPrimaryButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:visibility="gone" />
+
+                <Button
+                    android:id="@+id/panel_analyze"
+                    style="@style/StudySecondaryButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:text="@string/analyze_sentence"
+                    android:visibility="gone" />
+            </LinearLayout>
 
             <Button
-                android:id="@+id/panel_analyze"
+                android:id="@+id/reader_ask_tutor"
                 style="@style/StudySecondaryButton"
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:layout_weight="1"
-                android:text="@string/analyze_sentence"
+                android:layout_marginTop="8dp"
+                android:text="@string/ask_tutor"
                 android:visibility="gone" />
         </LinearLayout>
 

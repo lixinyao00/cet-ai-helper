@@ -30,6 +30,8 @@ import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import androidx.annotation.Nullable;
+
 import org.json.JSONException;
 
 import java.io.IOException;
@@ -43,6 +45,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Future;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 import com.cethelper.android.SessionStore.Session;
@@ -55,8 +58,6 @@ public final class MainActivity extends Activity {
     private static final String SIGN_IN_AGAIN = "会话已失效，请重新登录。";
     private static final String CONNECTION_ERROR = "无法连接服务，请检查网络和服务端地址。";
     private static final String INVALID_RESPONSE = "服务返回了无法读取的数据。";
-
-    private enum Screen { HOME, READER, VOCABULARY, CLOZE, IMPORT, TRANSLATION, WRITING }
 
     private record Practice(ClozeRound round, ReadingArticle fromReader) {}
 
@@ -74,13 +75,19 @@ public final class MainActivity extends Activity {
     private record RetainedState(
             Session session,
             boolean offline,
-            Screen screen,
-            ReaderSnapshot reader,
-            ReadingArticle vocabularyFromReader,
+            NavigationStack nav,
+            Map<NavEntry, ReaderSnapshot> readerSnapshots,
             String vocabularyQuery,
+            String vocabLevelFilter,
+            String vocabSourceFilter,
+            String vocabMasteryFilter,
+            int vocabularyScrollIndex,
+            int vocabularyScrollTop,
             Practice cloze,
             TranslationPractice translation,
-            WritingPractice writing
+            WritingPractice writing,
+            DictionaryState dictionary,
+            TutorState tutor
     ) {}
 
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -92,13 +99,24 @@ public final class MainActivity extends Activity {
     private SharedPreferences readerPrefs;
     private FrameLayout screen;
     private TextView sessionBanner;
+    @Nullable private View bottomNav;
     private View page;
     private Runnable backAction;
+    @Nullable private BooleanSupplier backInterceptor;
     private Session session;
-    private Screen currentScreen = Screen.HOME;
+    private NavigationStack nav = new NavigationStack();
+    private final Map<NavEntry, ReaderSnapshot> readerSnapshots = new HashMap<>();
     private Reader activeReader;
-    private ReadingArticle vocabularyFromReader;
+    @Nullable private DictionaryScreen activeDictionaryScreen;
+    @Nullable private TutorScreen activeTutorScreen;
+    private DictionaryState dictionaryState = new DictionaryState();
+    private TutorState tutorState = new TutorState();
     private String vocabularyQuery = "";
+    private String vocabLevelFilter = "";
+    private String vocabSourceFilter = "";
+    private String vocabMasteryFilter = "";
+    private int vocabularyScrollIndex;
+    private int vocabularyScrollTop;
     private Practice practice;
     private TranslationPractice translation;
     private WritingPractice writing;
@@ -110,6 +128,7 @@ public final class MainActivity extends Activity {
     private boolean started;
     private boolean offline;
     private boolean reverifying;
+    private String lastHealthModeLabel = "";
     private Future<?> pendingLookup;
     private Future<?> pendingAnalysis;
 
@@ -123,6 +142,8 @@ public final class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
         screen = findViewById(R.id.screen);
         sessionBanner = findViewById(R.id.session_banner);
+        bottomNav = findViewById(R.id.bottom_nav);
+        bindBottomNav();
         if (Build.VERSION.SDK_INT >= 30) {
             getWindow().setDecorFitsSystemWindows(false);
             View root = findViewById(R.id.study_root);
@@ -141,23 +162,75 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private void bindBottomNav() {
+        if (bottomNav == null) {
+            return;
+        }
+        View navHome = bottomNav.findViewById(R.id.nav_home);
+        if (navHome != null) {
+            navHome.setOnClickListener(v -> selectTab(NavEntry.Screen.HOME));
+        }
+        View navDict = bottomNav.findViewById(R.id.nav_dictionary);
+        if (navDict != null) {
+            navDict.setOnClickListener(v -> selectTab(NavEntry.Screen.DICTIONARY));
+        }
+        View navTutor = bottomNav.findViewById(R.id.nav_tutor);
+        if (navTutor != null) {
+            navTutor.setOnClickListener(v -> selectTab(NavEntry.Screen.TUTOR));
+        }
+        View navVocab = bottomNav.findViewById(R.id.nav_vocabulary);
+        if (navVocab != null) {
+            navVocab.setOnClickListener(v -> selectTab(NavEntry.Screen.VOCABULARY));
+        }
+    }
+
+    private void updateBottomNav(boolean visible, @Nullable NavEntry.Screen activeTab) {
+        if (bottomNav == null) {
+            return;
+        }
+        bottomNav.setVisibility(visible ? View.VISIBLE : View.GONE);
+        if (visible) {
+            setTabSelected(R.id.nav_home, activeTab == NavEntry.Screen.HOME);
+            setTabSelected(R.id.nav_dictionary, activeTab == NavEntry.Screen.DICTIONARY);
+            setTabSelected(R.id.nav_tutor, activeTab == NavEntry.Screen.TUTOR);
+            setTabSelected(R.id.nav_vocabulary, activeTab == NavEntry.Screen.VOCABULARY);
+        }
+    }
+
+    private void setTabSelected(int id, boolean selected) {
+        if (bottomNav == null) {
+            return;
+        }
+        View item = bottomNav.findViewById(id);
+        if (item != null) {
+            item.setSelected(selected);
+        }
+    }
+
     @Override
     @SuppressWarnings("deprecation")
     public Object onRetainNonConfigurationInstance() {
         if (session == null) {
             return null;
         }
-        ReaderSnapshot readerSnapshot = activeReader != null ? activeReader.snapshot() : null;
+        captureActiveReaderSnapshot();
+        captureVocabularyScroll();
         return new RetainedState(
                 session,
                 offline,
-                currentScreen,
-                readerSnapshot,
-                vocabularyFromReader,
+                nav,
+                new HashMap<>(readerSnapshots),
                 vocabularyQuery,
+                vocabLevelFilter,
+                vocabSourceFilter,
+                vocabMasteryFilter,
+                vocabularyScrollIndex,
+                vocabularyScrollTop,
                 practice,
                 translation,
-                writing);
+                writing,
+                dictionaryState,
+                tutorState);
     }
 
     @SuppressWarnings("deprecation")
@@ -166,52 +239,26 @@ public final class MainActivity extends Activity {
                 && sessions.matches(retained.session().serverUrl(), retained.session().token())) {
             session = retained.session();
             setOffline(retained.offline());
-            vocabularyFromReader = retained.vocabularyFromReader();
+            nav = retained.nav() != null ? retained.nav() : new NavigationStack();
+            readerSnapshots.clear();
+            if (retained.readerSnapshots() != null) {
+                readerSnapshots.putAll(retained.readerSnapshots());
+            }
             vocabularyQuery = retained.vocabularyQuery() == null ? "" : retained.vocabularyQuery();
+            vocabLevelFilter = retained.vocabLevelFilter() == null ? "" : retained.vocabLevelFilter();
+            vocabSourceFilter = retained.vocabSourceFilter() == null ? "" : retained.vocabSourceFilter();
+            vocabMasteryFilter = retained.vocabMasteryFilter() == null ? "" : retained.vocabMasteryFilter();
+            vocabularyScrollIndex = retained.vocabularyScrollIndex();
+            vocabularyScrollTop = retained.vocabularyScrollTop();
             practice = retained.cloze();
             translation = retained.translation();
             writing = retained.writing();
+            dictionaryState = retained.dictionary() != null ? retained.dictionary() : new DictionaryState();
+            tutorState = retained.tutor() != null ? retained.tutor() : new TutorState();
             if (pageImport.resume(session.owner())) {
                 return true;
             }
-            switch (retained.screen()) {
-                case CLOZE -> {
-                    if (practice != null) {
-                        showPractice();
-                        return true;
-                    }
-                }
-                case READER -> {
-                    if (retained.reader() != null) {
-                        restoreReaderSnapshot(retained.reader());
-                        return true;
-                    }
-                }
-                case VOCABULARY -> {
-                    showVocabulary(vocabularyFromReader);
-                    return true;
-                }
-                case WRITING -> {
-                    if (writing != null) {
-                        showWriting();
-                        return true;
-                    }
-                }
-                case TRANSLATION -> {
-                    if (translation != null) {
-                        if (translation.answering) {
-                            showTranslationAnswer();
-                        } else {
-                            showTranslationSource();
-                        }
-                        return true;
-                    }
-                }
-                case IMPORT, HOME -> {
-                    // Fall through to showHome().
-                }
-            }
-            showHome();
+            renderTop();
             return true;
         }
         return false;
@@ -239,15 +286,21 @@ public final class MainActivity extends Activity {
     protected void onSaveInstanceState(Bundle state) {
         super.onSaveInstanceState(state);
         drafts.flush();
+        captureActiveReaderSnapshot();
+        captureVocabularyScroll();
         state.putBundle("import", pageImport.saveState());
-        state.putString("screen", currentScreen.name());
+        state.putParcelableArrayList("nav_stack", nav.toBundles());
+        NavEntry top = nav.top();
+        state.putString("screen", top == null ? NavEntry.Screen.HOME.name() : top.screen.name());
         state.putString("vocab_query", vocabularyQuery);
+        state.putString("vocab_level", vocabLevelFilter);
+        state.putString("vocab_source", vocabSourceFilter);
+        state.putString("vocab_mastery", vocabMasteryFilter);
+        state.putInt("vocab_scroll_index", vocabularyScrollIndex);
+        state.putInt("vocab_scroll_top", vocabularyScrollTop);
         if (session != null) {
             state.putString("session_owner_server", session.serverUrl());
             state.putLong("session_owner_id", session.student().id());
-        }
-        if (vocabularyFromReader != null) {
-            state.putString("vocab_from_article_id", vocabularyFromReader.id());
         }
         if (activeReader != null) {
             ReaderSnapshot snap = activeReader.snapshot();
@@ -286,6 +339,14 @@ public final class MainActivity extends Activity {
             activeReader.detach();
             activeReader = null;
         }
+        if (activeDictionaryScreen != null) {
+            activeDictionaryScreen.release();
+            activeDictionaryScreen = null;
+        }
+        if (activeTutorScreen != null) {
+            activeTutorScreen.release();
+            activeTutorScreen = null;
+        }
         if (pendingLookup != null) {
             pendingLookup.cancel(true);
             pendingLookup = null;
@@ -303,6 +364,14 @@ public final class MainActivity extends Activity {
                 closeWriting();
             }
         }
+        if (!isChangingConfigurations()) {
+            tutorState.stop();
+            dictionaryState.reset();
+            tutorState.reset();
+        } else {
+            dictionaryState.setListener(null);
+            tutorState.setListener(null);
+        }
         if (isFinishing()) {
             pageImport.reset();
         }
@@ -318,10 +387,226 @@ public final class MainActivity extends Activity {
     @Override
     @SuppressWarnings("deprecation")
     public void onBackPressed() {
+        if (backInterceptor != null && backInterceptor.getAsBoolean()) {
+            return;
+        }
         if (backAction != null) {
             backAction.run();
         } else {
             super.onBackPressed();
+        }
+    }
+
+    // ===== Public Host API (PLAN.md §2.4) =====
+
+    void navigateBack() {
+        if (session == null) {
+            super.onBackPressed();
+            return;
+        }
+        NavEntry popped = nav.top();
+        NavEntry next = nav.pop();
+        if (next == null) {
+            super.onBackPressed();
+            return;
+        }
+        cleanupPoppedEntry(popped);
+        renderTop();
+    }
+
+    void selectTab(NavEntry.Screen tab) {
+        if (session == null || !NavEntry.isL1TabScreen(tab)) {
+            return;
+        }
+        practice = null;
+        closeTranslation();
+        closeWriting();
+        readerSnapshots.clear();
+        nav.resetTo(NavEntry.tab(tab));
+        renderTop();
+    }
+
+    void openDictionary(@Nullable String query) {
+        if (session == null) {
+            return;
+        }
+        captureActiveReaderSnapshot();
+        captureVocabularyScroll();
+        Bundle args = new Bundle();
+        if (query != null && !ReadingArticle.trimSpace(query).isEmpty()) {
+            args.putString(NavEntry.ARG_QUERY, ReadingArticle.trimSpace(query));
+        }
+        nav.push(NavEntry.dictionary(args, false));
+        if (query != null && !ReadingArticle.trimSpace(query).isEmpty()) {
+            dictionaryState.lookup(this, query);
+        }
+        renderTop();
+    }
+
+    void openTutorWithContext(TutorContext context) {
+        if (session == null) {
+            return;
+        }
+        captureActiveReaderSnapshot();
+        captureVocabularyScroll();
+        TutorContext target = context == null ? TutorContext.free() : context;
+        Bundle args = new Bundle();
+        args.putBundle(NavEntry.ARG_TUTOR_CONTEXT, target.toBundle());
+        nav.push(NavEntry.tutor(args, false));
+        tutorState.attach(this, target);
+        renderTop();
+    }
+
+    View showL1Screen(int layout, NavEntry.Screen tab) {
+        View view = show(layout);
+        updateBottomNav(true, tab);
+        setBackAction(tab == NavEntry.Screen.HOME ? null : this::navigateBack);
+        return view;
+    }
+
+    View showL2Screen(int layout, CharSequence title) {
+        View view = show(layout, this::navigateBack);
+        updateBottomNav(false, null);
+        View back = view.findViewById(R.id.top_bar_back);
+        if (back != null) {
+            back.setOnClickListener(v -> navigateBack());
+        }
+        View titleView = view.findViewById(R.id.top_bar_title);
+        if (titleView instanceof TextView textView && title != null) {
+            textView.setText(title);
+        }
+        return view;
+    }
+
+    StudyApplication app() {
+        return app;
+    }
+
+    @Nullable
+    Session session() {
+        return session;
+    }
+
+    boolean handleUnauthorized(Exception e) {
+        return handleUnauthorized(session, e);
+    }
+
+    DictionaryState dictionaryState() {
+        return dictionaryState;
+    }
+
+    TutorState tutorState() {
+        return tutorState;
+    }
+
+    private void cleanupPoppedEntry(@Nullable NavEntry popped) {
+        if (popped == null) {
+            return;
+        }
+        readerSnapshots.remove(popped);
+        switch (popped.screen) {
+            case CLOZE -> {
+                if (!nav.contains(NavEntry.Screen.CLOZE)) {
+                    practice = null;
+                }
+            }
+            case TRANSLATION -> {
+                if (!nav.contains(NavEntry.Screen.TRANSLATION)) {
+                    closeTranslation();
+                }
+            }
+            case WRITING -> {
+                if (!nav.contains(NavEntry.Screen.WRITING)) {
+                    closeWriting();
+                }
+            }
+            default -> {
+                // Other screens retain or discard state via their own controllers.
+            }
+        }
+    }
+
+    private void captureActiveReaderSnapshot() {
+        NavEntry top = nav.top();
+        if (activeReader != null && top != null && top.screen == NavEntry.Screen.READER) {
+            readerSnapshots.put(top, activeReader.snapshot());
+        }
+    }
+
+    private void captureVocabularyScroll() {
+        NavEntry top = nav.top();
+        if (page != null && top != null && top.screen == NavEntry.Screen.VOCABULARY) {
+            View list = page.findViewById(R.id.vocabulary_list);
+            if (list instanceof ListView listView) {
+                vocabularyScrollIndex = listView.getFirstVisiblePosition();
+                View firstChild = listView.getChildAt(0);
+                vocabularyScrollTop = firstChild == null ? 0 : firstChild.getTop();
+            }
+        }
+    }
+
+    private void renderTop() {
+        NavEntry top = nav.top();
+        if (top == null) {
+            nav.resetTo(NavEntry.home());
+            top = nav.top();
+        }
+        switch (top.screen) {
+            case HOME -> renderHome();
+            case DICTIONARY -> {
+                boolean asTab = top.isRoot();
+                DictionaryScreen screenController = new DictionaryScreen(this, dictionaryState, asTab);
+                screenController.show();
+                activeDictionaryScreen = screenController;
+            }
+            case TUTOR -> {
+                boolean asTab = top.isRoot();
+                TutorContext ctx = TutorContext.free();
+                if (top.args != null && top.args.containsKey(NavEntry.ARG_TUTOR_CONTEXT)) {
+                    ctx = TutorContext.fromBundle(top.args.getBundle(NavEntry.ARG_TUTOR_CONTEXT));
+                }
+                tutorState.attach(this, ctx);
+                TutorScreen screenController = new TutorScreen(this, tutorState, asTab);
+                screenController.show();
+                activeTutorScreen = screenController;
+            }
+            case VOCABULARY -> renderVocabulary(top.isRoot());
+            case READER -> {
+                ReaderSnapshot snapshot = readerSnapshots.get(top);
+                if (snapshot != null) {
+                    restoreReaderSnapshot(snapshot);
+                } else if (top.articleId != null && session != null) {
+                    boolean fromPractice = top.args != null && top.args.getBoolean(NavEntry.ARG_FROM_PRACTICE, false);
+                    loadArticleById(session.owner(), top.articleId, article -> {
+                        if (article == null) {
+                            navigateBack();
+                        } else {
+                            int savedScroll = DemoArticle.ID.equals(article.id())
+                                    ? readerPrefs.getInt(demoScrollKey(session.owner()), 0) : 0;
+                            renderReaderView(article, null, savedScroll, fromPractice, null);
+                        }
+                    });
+                } else {
+                    showHome();
+                }
+            }
+            case CLOZE -> {
+                if (practice != null) {
+                    renderPractice();
+                } else {
+                    navigateBack();
+                }
+            }
+            case TRANSLATION -> {
+                TranslationPractice exercise = translation();
+                if (exercise.answering && !exercise.source.isEmpty()) {
+                    renderTranslationAnswer();
+                } else {
+                    renderTranslationSource();
+                }
+            }
+            case WRITING -> renderWriting();
+            case IMPORT -> renderHome();
         }
     }
 
@@ -330,6 +615,14 @@ public final class MainActivity extends Activity {
             activeReader.flushProgress();
             activeReader.detach();
             activeReader = null;
+        }
+        if (activeDictionaryScreen != null) {
+            activeDictionaryScreen.release();
+            activeDictionaryScreen = null;
+        }
+        if (activeTutorScreen != null) {
+            activeTutorScreen.release();
+            activeTutorScreen = null;
         }
         if (translation != null) {
             translation.onChanged = null;
@@ -344,6 +637,8 @@ public final class MainActivity extends Activity {
         cancelPendingAnalysis();
         screen.removeAllViews();
         backAction = null;
+        backInterceptor = null;
+        updateBottomNav(false, null);
         page = getLayoutInflater().inflate(layout, screen, false);
         screen.addView(page);
         return page;
@@ -363,23 +658,21 @@ public final class MainActivity extends Activity {
     }
 
     View showImportScreen(int layout, Runnable onBack) {
-        currentScreen = Screen.IMPORT;
         return show(layout, onBack);
     }
 
     View showClozeScreen(int layout, Runnable onBack) {
-        currentScreen = Screen.CLOZE;
-        return show(layout, onBack);
+        return show(layout, this::navigateBack);
     }
 
     View showWritingScreen(int layout, Runnable onBack) {
-        currentScreen = Screen.WRITING;
-        return show(layout, onBack);
+        return show(layout, this::navigateBack);
     }
 
     View showTranslationScreen(int layout, Runnable onBack) {
-        currentScreen = Screen.TRANSLATION;
-        return show(layout, onBack);
+        Runnable resolvedBack = (layout == R.layout.screen_translation_answer && onBack != null)
+                ? onBack : this::navigateBack;
+        return show(layout, resolvedBack);
     }
 
     void setBackAction(Runnable onBack) {
@@ -545,9 +838,28 @@ public final class MainActivity extends Activity {
         if (saved != null && restoreFromBundle(account, saved)) {
             return;
         }
+        resetAccountState();
         showHome();
     }
 
+    private void resetAccountState() {
+        practice = null;
+        closeTranslation();
+        closeWriting();
+        readerSnapshots.clear();
+        dictionaryState.reset();
+        tutorState.reset();
+        vocabularyQuery = "";
+        vocabLevelFilter = "";
+        vocabSourceFilter = "";
+        vocabMasteryFilter = "";
+        vocabularyScrollIndex = 0;
+        vocabularyScrollTop = 0;
+        lastHealthModeLabel = "";
+        nav.resetTo(NavEntry.home());
+    }
+
+    @SuppressWarnings("deprecation")
     private boolean restoreFromBundle(Session account, Bundle saved) {
         String savedServer = saved.getString("session_owner_server");
         long savedStudentId = saved.getLong("session_owner_id", -1L);
@@ -555,15 +867,22 @@ public final class MainActivity extends Activity {
             return false;
         }
         vocabularyQuery = saved.getString("vocab_query", "");
-        Screen targetScreen;
-        try {
-            targetScreen = Screen.valueOf(saved.getString("screen", Screen.HOME.name()));
-        } catch (IllegalArgumentException ignored) {
-            return false;
+        vocabLevelFilter = saved.getString("vocab_level", "");
+        vocabSourceFilter = saved.getString("vocab_source", "");
+        vocabMasteryFilter = saved.getString("vocab_mastery", "");
+        vocabularyScrollIndex = saved.getInt("vocab_scroll_index", 0);
+        vocabularyScrollTop = saved.getInt("vocab_scroll_top", 0);
+        ArrayList<Bundle> savedNav = saved.getParcelableArrayList("nav_stack");
+        if (savedNav != null && !savedNav.isEmpty()) {
+            nav = NavigationStack.fromBundles(savedNav);
+        } else {
+            nav.resetTo(NavEntry.home());
         }
+        NavEntry top = nav.top();
+        NavEntry.Screen targetScreen = top != null ? top.screen : NavEntry.Screen.HOME;
         switch (targetScreen) {
             case WRITING -> {
-                showWriting();
+                renderWriting();
                 return true;
             }
             case TRANSLATION -> {
@@ -572,24 +891,27 @@ public final class MainActivity extends Activity {
                     String activeSource = saved.getString("translation_active_source", "");
                     if (!activeSource.isEmpty()) {
                         exercise.begin(activeSource);
-                        showTranslationAnswer();
+                        renderTranslationAnswer();
                         return true;
                     }
                 }
-                showTranslationSource();
+                renderTranslationSource();
                 return true;
             }
             case VOCABULARY -> {
-                String fromArticleId = saved.getString("vocab_from_article_id");
-                if (fromArticleId == null) {
-                    showVocabulary(null);
-                    return true;
-                }
-                loadArticleById(account.owner(), fromArticleId, article -> showVocabulary(article));
+                renderVocabulary(top.isRoot());
+                return true;
+            }
+            case DICTIONARY -> {
+                renderTop();
+                return true;
+            }
+            case TUTOR -> {
+                renderTop();
                 return true;
             }
             case READER -> {
-                String articleId = saved.getString("reader_article_id");
+                String articleId = top.articleId != null ? top.articleId : saved.getString("reader_article_id");
                 if (articleId == null) {
                     return false;
                 }
@@ -597,11 +919,12 @@ public final class MainActivity extends Activity {
                 int selStart = saved.getInt("reader_sel_start", -1);
                 int selEnd = saved.getInt("reader_sel_end", -1);
                 boolean analysisOpen = saved.getBoolean("reader_analysis_open", false);
+                boolean fromPractice = saved.getBoolean("reader_from_practice", false);
                 loadArticleById(account.owner(), articleId, article -> {
                     if (article == null) {
                         showHome();
                     } else {
-                        restoreReaderSnapshot(new ReaderSnapshot(article, false, scrollY,
+                        restoreReaderSnapshot(new ReaderSnapshot(article, fromPractice, scrollY,
                                 selStart, selEnd, analysisOpen, null, null));
                     }
                 });
@@ -613,7 +936,7 @@ public final class MainActivity extends Activity {
                     return false;
                 }
                 String fromArticleId = saved.getString("cloze_from_article_id");
-                View loading = show(R.layout.screen_status, this::showHome);
+                View loading = show(R.layout.screen_status, this::navigateBack);
                 loading.<TextView>findViewById(R.id.status_message).setText(R.string.cloze_loading);
                 ReadingArticle builtIn = example();
                 ArticleOwner owner = account.owner();
@@ -654,9 +977,9 @@ public final class MainActivity extends Activity {
                             if (isCurrent(loading)) {
                                 if (restored != null) {
                                     practice = new Practice(restored, resolvedFromReader);
-                                    showPractice();
+                                    renderPractice();
                                 } else {
-                                    showVocabulary(resolvedFromReader);
+                                    navigateBack();
                                 }
                             }
                         });
@@ -769,21 +1092,15 @@ public final class MainActivity extends Activity {
 
     private void clearSession(String reason) {
         pageImport.reset();
-        practice = null;
-        vocabularyFromReader = null;
-        vocabularyQuery = "";
         pendingRestoreBundle = null;
-        closeTranslation();
-        closeWriting();
+        resetAccountState();
         session = null;
-        currentScreen = Screen.HOME;
         setOffline(false);
         sessions.clear();
         showLogin(reason);
     }
 
     private void showLogin(String reason) {
-        currentScreen = Screen.HOME;
         View loginPage = show(R.layout.screen_login);
         EditText name = loginPage.findViewById(R.id.username);
         EditText password = loginPage.findViewById(R.id.password);
@@ -884,11 +1201,16 @@ public final class MainActivity extends Activity {
                     field.setError("请输入有效的 HTTP 或 HTTPS 服务端地址。");
                     return;
                 }
+                boolean wasLoggedIn = session != null;
                 sessions.changeServer(url);
                 dialog.dismiss();
-                TextView loginStatus = page.findViewById(R.id.login_status);
-                if (loginStatus != null) {
-                    setMessage(loginStatus, "服务端地址已保存。");
+                if (wasLoggedIn) {
+                    clearSession("服务端地址已保存，请重新登录。");
+                } else {
+                    TextView loginStatus = page.findViewById(R.id.login_status);
+                    if (loginStatus != null) {
+                        setMessage(loginStatus, "服务端地址已保存。");
+                    }
                 }
             });
         });
@@ -981,24 +1303,48 @@ public final class MainActivity extends Activity {
     }
 
     void showHome() {
-        currentScreen = Screen.HOME;
         practice = null;
-        vocabularyFromReader = null;
         closeTranslation();
         closeWriting();
-        View home = show(R.layout.screen_home);
+        readerSnapshots.clear();
+        nav.resetTo(NavEntry.home());
+        renderHome();
+    }
+
+    private void renderHome() {
+        View home = showL1Screen(R.layout.screen_home, NavEntry.Screen.HOME);
         home.<TextView>findViewById(R.id.current_student).setText(session.student().username());
         home.findViewById(R.id.open_article).setOnClickListener(v -> showReader(example(), null));
-        home.findViewById(R.id.open_vocabulary).setOnClickListener(v -> showVocabulary(null));
+        home.findViewById(R.id.open_vocabulary).setOnClickListener(v -> selectTab(NavEntry.Screen.VOCABULARY));
         home.findViewById(R.id.logout).setOnClickListener(v -> logout());
         home.findViewById(R.id.open_translation).setOnClickListener(v -> showTranslationSource());
         home.findViewById(R.id.open_writing).setOnClickListener(v -> showWriting());
         home.findViewById(R.id.capture_import).setOnClickListener(v -> pageImport.launch(true, PageImport.Target.READING));
         home.findViewById(R.id.pick_import).setOnClickListener(v -> pageImport.launch(false, PageImport.Target.READING));
 
-        View serverCheck = UiViews.findOptionalView(home, "home_server_status");
+        View openDict = home.findViewById(R.id.open_dictionary);
+        if (openDict != null) {
+            openDict.setOnClickListener(v -> selectTab(NavEntry.Screen.DICTIONARY));
+        }
+        View openTutor = home.findViewById(R.id.open_tutor);
+        if (openTutor != null) {
+            openTutor.setOnClickListener(v -> selectTab(NavEntry.Screen.TUTOR));
+        }
+        View serverCheck = home.findViewById(R.id.home_server_status);
         if (serverCheck != null) {
+            if (serverCheck instanceof TextView serverText) {
+                String stateLabel = offline ? "离线" : (lastHealthModeLabel.isEmpty() ? "在线" : lastHealthModeLabel);
+                serverText.setText(session.serverUrl() + " · " + stateLabel);
+            }
             serverCheck.setOnClickListener(v -> probeHomeServerHealth(home, session));
+        }
+        View homeSettings = home.findViewById(R.id.home_settings);
+        if (homeSettings != null) {
+            homeSettings.setOnClickListener(v -> editServerUrl());
+        }
+        View legacyServerSettings = UiViews.findOptionalView(home, "home_server_settings");
+        if (legacyServerSettings != null) {
+            legacyServerSettings.setOnClickListener(v -> editServerUrl());
         }
 
         loadHomeData(home, session, home.findViewById(R.id.imported_articles));
@@ -1015,7 +1361,12 @@ public final class MainActivity extends Activity {
                 String msg = "服务连接正常 · " + (modeLabel.isEmpty() ? health.status() : modeLabel) + verPart;
                 runOnUiThread(() -> {
                     if (isCurrent(home)) {
+                        lastHealthModeLabel = modeLabel.isEmpty() ? health.status() : modeLabel;
                         setMessage(status, msg);
+                        View serverCheck = home.findViewById(R.id.home_server_status);
+                        if (serverCheck instanceof TextView serverText) {
+                            serverText.setText(account.serverUrl() + " · " + lastHealthModeLabel);
+                        }
                     }
                 });
             } catch (ApiClient.Failure | IOException | JSONException failure) {
@@ -1037,6 +1388,14 @@ public final class MainActivity extends Activity {
     }
 
     void showTranslationSource() {
+        NavEntry top = nav.top();
+        if (top == null || top.screen != NavEntry.Screen.TRANSLATION) {
+            nav.push(NavEntry.of(NavEntry.Screen.TRANSLATION));
+        }
+        renderTranslationSource();
+    }
+
+    private void renderTranslationSource() {
         TranslationPractice exercise = translation();
         exercise.answering = false;
         TranslationScreen.showSource(this, exercise,
@@ -1044,12 +1403,20 @@ public final class MainActivity extends Activity {
     }
 
     void startTranslation(String correctedSource) {
+        NavEntry top = nav.top();
+        if (top == null || top.screen != NavEntry.Screen.TRANSLATION) {
+            nav.push(NavEntry.of(NavEntry.Screen.TRANSLATION));
+        }
         translation().begin(correctedSource);
-        showTranslationAnswer();
+        renderTranslationAnswer();
     }
 
     void showTranslationAnswerFromHistory() {
-        showTranslationAnswer();
+        NavEntry top = nav.top();
+        if (top == null || top.screen != NavEntry.Screen.TRANSLATION) {
+            nav.push(NavEntry.of(NavEntry.Screen.TRANSLATION));
+        }
+        renderTranslationAnswer();
     }
 
     void replaceTranslation(View page, String source, Runnable onReplaced) {
@@ -1076,7 +1443,7 @@ public final class MainActivity extends Activity {
                 }).show();
     }
 
-    private void showTranslationAnswer() {
+    private void renderTranslationAnswer() {
         Session account = session;
         TranslationScreen.showAnswer(this, translation, failure -> handleUnauthorized(account, failure));
     }
@@ -1090,6 +1457,14 @@ public final class MainActivity extends Activity {
     }
 
     void showWriting() {
+        NavEntry top = nav.top();
+        if (top == null || top.screen != NavEntry.Screen.WRITING) {
+            nav.push(NavEntry.of(NavEntry.Screen.WRITING));
+        }
+        renderWriting();
+    }
+
+    private void renderWriting() {
         Session account = session;
         if (writing == null) {
             writing = new WritingPractice(app.practiceRequests, account.owner(), account.token(),
@@ -1214,9 +1589,14 @@ public final class MainActivity extends Activity {
         if (!isCurrent(source)) {
             return;
         }
+        if (Favorite.DICT_ARTICLE_ID.equals(articleId)) {
+            openDictionary(favorite == null ? null : favorite.selection);
+            return;
+        }
+        captureVocabularyScroll();
         if (DemoArticle.ID.equals(articleId)) {
             int savedScroll = favorite == null ? readerPrefs.getInt(demoScrollKey(session.owner()), 0) : 0;
-            showReaderWithScroll(example(), favorite, savedScroll, this::showHome, R.string.back, false);
+            pushReader(example(), favorite, savedScroll, false);
             return;
         }
         ArticleOwner owner = articleOwner();
@@ -1229,8 +1609,7 @@ public final class MainActivity extends Activity {
                             articleOpenError(source, "找不到这篇本机材料。");
                         } else {
                             int savedScroll = favorite == null ? article.lastScrollY : 0;
-                            showReaderWithScroll(article.readingArticle(), favorite, savedScroll,
-                                    this::showHome, R.string.back, false);
+                            pushReader(article.readingArticle(), favorite, savedScroll, false);
                         }
                     }
                 });
@@ -1284,37 +1663,43 @@ public final class MainActivity extends Activity {
         if (favorite == null && session != null && DemoArticle.ID.equals(article.id())) {
             savedScroll = readerPrefs.getInt(demoScrollKey(session.owner()), 0);
         }
-        showReaderWithScroll(article, favorite, savedScroll, this::showHome, R.string.back, false);
+        pushReader(article, favorite, savedScroll, false);
     }
 
     void showReader(ReadingArticle article, Favorite favorite, Runnable backToPractice) {
-        showReaderWithScroll(article, favorite, 0, backToPractice, R.string.cloze_return_to_round, true);
+        pushReader(article, favorite, 0, true);
     }
 
-    private void showReaderWithScroll(ReadingArticle article, Favorite favorite, int initialScrollY,
-                                      Runnable onBack, int backLabel, boolean fromPractice) {
-        currentScreen = Screen.READER;
-        View readerView = show(R.layout.screen_reader, onBack);
+    private void pushReader(ReadingArticle article, Favorite favorite, int initialScrollY, boolean fromPractice) {
+        captureActiveReaderSnapshot();
+        captureVocabularyScroll();
+        Bundle args = new Bundle();
+        args.putBoolean(NavEntry.ARG_FROM_PRACTICE, fromPractice);
+        if (favorite != null) {
+            args.putInt(NavEntry.ARG_FAV_START, favorite.startOffset);
+            args.putInt(NavEntry.ARG_FAV_END, favorite.endOffset);
+            args.putString(NavEntry.ARG_FAV_SELECTION, favorite.selection);
+        }
+        nav.push(NavEntry.reader(article.id(), args));
+        renderReaderView(article, favorite, initialScrollY, fromPractice, null);
+    }
+
+    private void renderReaderView(ReadingArticle article, @Nullable Favorite favorite, int initialScrollY,
+                                  boolean fromPractice, @Nullable ReaderSnapshot restoreSnap) {
+        int backLabel = fromPractice ? R.string.cloze_return_to_round : R.string.back;
+        View readerView = show(R.layout.screen_reader, this::navigateBack);
         Button back = readerView.findViewById(R.id.reader_back);
         back.setText(backLabel);
-        back.setOnClickListener(v -> onBack.run());
+        back.setOnClickListener(v -> navigateBack());
         Reader reader = new Reader(readerView, article, fromPractice);
         activeReader = reader;
-        reader.open(favorite, initialScrollY, null);
+        backInterceptor = reader::handleBackPressed;
+        reader.open(favorite, initialScrollY, restoreSnap);
     }
 
     private void restoreReaderSnapshot(ReaderSnapshot snap) {
         boolean backToPractice = snap.fromPractice() && practice != null;
-        Runnable onBack = backToPractice ? this::showPractice : this::showHome;
-        int backLabel = backToPractice ? R.string.cloze_return_to_round : R.string.back;
-        currentScreen = Screen.READER;
-        View readerView = show(R.layout.screen_reader, onBack);
-        Button back = readerView.findViewById(R.id.reader_back);
-        back.setText(backLabel);
-        back.setOnClickListener(v -> onBack.run());
-        Reader reader = new Reader(readerView, snap.article(), backToPractice);
-        activeReader = reader;
-        reader.open(null, snap.scrollY(), snap);
+        renderReaderView(snap.article(), null, snap.scrollY(), backToPractice, snap);
     }
 
     private final class Reader {
@@ -1448,32 +1833,21 @@ public final class MainActivity extends Activity {
                 updateFontToggleLabel(fontTier);
                 fontToggle.setOnClickListener(v -> cycleFontSize());
             }
-            view.findViewById(R.id.reader_vocabulary).setOnClickListener(v -> showVocabulary(article));
-            Runnable closePanel = () -> {
-                revision++;
-                analysisRevision++;
-                cancelPendingAnalysis();
-                if (pendingLookup != null) {
-                    pendingLookup.cancel(true);
-                    pendingLookup = null;
-                }
-                currentSelection = null;
-                lastExplanation = null;
-                lastAnalysis = null;
-                analysisOpen = false;
-                clearMark();
-                panel.setVisibility(View.GONE);
-                articleScroll.post(() -> {
-                    if (isCurrent(view) && panel.getVisibility() == View.GONE) {
-                        articleScroll.scrollTo(0, readingPosition);
-                        updateScrollProgress(readingPosition);
-                    }
-                });
-            };
+            view.findViewById(R.id.reader_vocabulary).setOnClickListener(v -> pushVocabularyFromReader(article));
+            Runnable closePanel = this::closePanelInternal;
             view.findViewById(R.id.panel_close).setOnClickListener(v -> closePanel.run());
             View optionalClose = UiViews.findOptionalView(view, "reader_word_close");
             if (optionalClose != null) {
                 optionalClose.setOnClickListener(v -> closePanel.run());
+            }
+
+            View readerAskTutor = view.findViewById(R.id.reader_ask_tutor);
+            if (readerAskTutor != null) {
+                readerAskTutor.setOnClickListener(v -> askTutorAboutCurrentWord());
+            }
+            View analysisAskTutor = view.findViewById(R.id.analysis_ask_tutor);
+            if (analysisAskTutor != null) {
+                analysisAskTutor.setOnClickListener(v -> askTutorAboutCurrentSentence());
             }
 
             title.setOnClickListener(v -> speakCurrentTarget());
@@ -1917,12 +2291,85 @@ public final class MainActivity extends Activity {
             action.setVisibility(View.VISIBLE);
         }
 
+        boolean handleBackPressed() {
+            if (panel.getVisibility() == View.VISIBLE) {
+                closePanelInternal();
+                return true;
+            }
+            return false;
+        }
+
+        private void closePanelInternal() {
+            revision++;
+            analysisRevision++;
+            cancelPendingAnalysis();
+            if (pendingLookup != null) {
+                pendingLookup.cancel(true);
+                pendingLookup = null;
+            }
+            currentSelection = null;
+            lastExplanation = null;
+            lastAnalysis = null;
+            analysisOpen = false;
+            clearMark();
+            panel.setVisibility(View.GONE);
+            articleScroll.post(() -> {
+                if (isCurrent(view) && panel.getVisibility() == View.GONE) {
+                    articleScroll.scrollTo(0, readingPosition);
+                    updateScrollProgress(readingPosition);
+                }
+            });
+        }
+
+        private void askTutorAboutCurrentWord() {
+            if (currentSelection == null) {
+                return;
+            }
+            String titleText = (lastExplanation != null && !lastExplanation.lemma().isEmpty())
+                    ? lastExplanation.lemma()
+                    : currentSelection.text();
+            String extra = "";
+            if (lastExplanation != null) {
+                extra = "释义：" + lastExplanation.meaning()
+                        + (lastExplanation.detail().isEmpty() ? "" : "\n" + lastExplanation.detail());
+            }
+            openTutorWithContext(new TutorContext(
+                    TutorContext.WORD,
+                    titleText,
+                    currentSelection.text(),
+                    currentSelection.sentence() == null ? "" : currentSelection.sentence(),
+                    extra
+            ));
+        }
+
+        private void askTutorAboutCurrentSentence() {
+            String sentence = currentSelection != null && currentSelection.sentence() != null
+                    ? currentSelection.sentence()
+                    : (lastAnalysis != null ? lastAnalysis.sentence() : "");
+            if (sentence.isEmpty()) {
+                return;
+            }
+            String extra = "";
+            if (lastAnalysis != null) {
+                extra = "参考译文：" + lastAnalysis.translation()
+                        + "\n句子主干：" + lastAnalysis.structure();
+            }
+            openTutorWithContext(new TutorContext(
+                    TutorContext.SENTENCE,
+                    "长难句分析",
+                    sentence,
+                    "",
+                    extra
+            ));
+        }
+
         private void favorite(Session account, int requestRevision, ReadingArticle.Selection selection,
                               ApiClient.Explanation result) {
             Favorite row = new Favorite(account.serverUrl(), account.student().id(), article.id(),
                     selection.start(), selection.end(), selection.text(), selection.sentence(),
                     result.meaning(), result.detail(), result.mode(), System.currentTimeMillis(),
-                    result.phonetic(), result.partOfSpeech());
+                    result.phonetic(), result.partOfSpeech(),
+                    result.lemma(), result.cetLevel(), Favorite.SOURCE_READER);
             panelButton("正在收藏…", null);
             app.storage.execute(() -> {
                 try {
@@ -1944,23 +2391,34 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private void showVocabulary(ReadingArticle fromReader) {
-        currentScreen = Screen.VOCABULARY;
-        vocabularyFromReader = fromReader;
+    private void pushVocabularyFromReader(ReadingArticle fromReader) {
+        captureActiveReaderSnapshot();
+        Bundle args = new Bundle();
+        if (fromReader != null) {
+            args.putString(NavEntry.ARG_FROM_READER_ID, fromReader.id());
+        }
+        nav.push(NavEntry.vocabulary(args, false));
+        renderVocabulary(false);
+    }
+
+    private void renderVocabulary(boolean asTab) {
         practice = null;
         Session account = session;
-        View vocabulary = show(R.layout.screen_vocabulary);
+        View vocabulary = asTab
+                ? showL1Screen(R.layout.screen_vocabulary, NavEntry.Screen.VOCABULARY)
+                : show(R.layout.screen_vocabulary, this::navigateBack);
         vocabulary.<TextView>findViewById(R.id.vocabulary_student).setText(account.student().username());
-        Runnable returnBack = fromReader == null ? this::showHome : () -> showReader(fromReader, null);
-        backAction = returnBack;
-        vocabulary.findViewById(R.id.vocabulary_back).setOnClickListener(v -> returnBack.run());
+        View backButton = vocabulary.findViewById(R.id.vocabulary_back);
+        if (backButton != null) {
+            backButton.setOnClickListener(v -> navigateBack());
+        }
         View start = vocabulary.findViewById(R.id.cloze_start);
         TextView status = vocabulary.findViewById(R.id.vocabulary_status);
         View retry = vocabulary.findViewById(R.id.vocabulary_retry);
         EditText searchInput = UiViews.findOptionalView(vocabulary, "vocabulary_search_input", EditText.class);
         TextView summaryStats = UiViews.findOptionalView(vocabulary, "vocabulary_summary_stats", TextView.class);
         ListView listView = vocabulary.findViewById(R.id.vocabulary_list);
-        retry.setOnClickListener(v -> showVocabulary(fromReader));
+        retry.setOnClickListener(v -> renderVocabulary(asTab));
         setMessage(status, "正在读取收藏…");
         app.storage.execute(() -> {
             try {
@@ -1973,7 +2431,7 @@ public final class MainActivity extends Activity {
                                         status, summaryStats, start, searchInput));
                         listView.setAdapter(adapter);
                         Runnable refreshUi = () -> {
-                            adapter.filter(vocabularyQuery);
+                            adapter.filter(vocabularyQuery, vocabLevelFilter, vocabSourceFilter, vocabMasteryFilter);
                             updateVocabularyStats(summaryStats, allRows);
                             start.setEnabled(!allRows.isEmpty());
                             if (allRows.isEmpty()) {
@@ -1984,6 +2442,7 @@ public final class MainActivity extends Activity {
                                 setMessage(status, null);
                             }
                         };
+                        bindVocabularyFilters(vocabulary, refreshUi);
                         if (searchInput != null) {
                             searchInput.setText(vocabularyQuery);
                             searchInput.setSelection(searchInput.length());
@@ -1999,9 +2458,19 @@ public final class MainActivity extends Activity {
                             });
                         }
                         refreshUi.run();
+                        if (vocabularyScrollIndex > 0 || vocabularyScrollTop != 0) {
+                            int idx = vocabularyScrollIndex;
+                            int topOffset = vocabularyScrollTop;
+                            listView.post(() -> {
+                                if (isCurrent(vocabulary) && idx < adapter.getCount()) {
+                                    listView.setSelectionFromTop(idx, topOffset);
+                                }
+                            });
+                        }
                         start.setOnClickListener(v -> {
                             if (isCurrent(vocabulary) && !allRows.isEmpty()) {
-                                startPractice(account.owner(), allRows, fromReader);
+                                captureVocabularyScroll();
+                                startPractice(account.owner(), allRows);
                             }
                         });
                     }
@@ -2015,6 +2484,56 @@ public final class MainActivity extends Activity {
                 });
             }
         });
+    }
+
+    private void bindVocabularyFilters(View vocabulary, Runnable onChanged) {
+        bindChipGroup(vocabulary,
+                new int[]{R.id.vocab_level_all, R.id.vocab_level_cet4, R.id.vocab_level_cet6},
+                new String[]{"", "CET-4", "CET-6"},
+                () -> vocabLevelFilter,
+                val -> vocabLevelFilter = val,
+                onChanged);
+        bindChipGroup(vocabulary,
+                new int[]{R.id.vocab_source_all, R.id.vocab_source_reader, R.id.vocab_source_dictionary},
+                new String[]{"", Favorite.SOURCE_READER, Favorite.SOURCE_DICTIONARY},
+                () -> vocabSourceFilter,
+                val -> vocabSourceFilter = val,
+                onChanged);
+        bindChipGroup(vocabulary,
+                new int[]{R.id.vocab_mastery_all, R.id.vocab_mastery_new,
+                        R.id.vocab_mastery_learning, R.id.vocab_mastery_mastered},
+                new String[]{"", "new", "learning", "mastered"},
+                () -> vocabMasteryFilter,
+                val -> vocabMasteryFilter = val,
+                onChanged);
+    }
+
+    private void bindChipGroup(View root, int[] ids, String[] values,
+                               java.util.function.Supplier<String> getter,
+                               Consumer<String> setter, Runnable onChanged) {
+        Runnable syncSelection = () -> {
+            String current = getter.get();
+            for (int i = 0; i < ids.length; i++) {
+                View chip = root.findViewById(ids[i]);
+                if (chip != null) {
+                    chip.setSelected(values[i].equals(current));
+                }
+            }
+        };
+        for (int i = 0; i < ids.length; i++) {
+            final String value = values[i];
+            View chip = root.findViewById(ids[i]);
+            if (chip != null) {
+                chip.setOnClickListener(v -> {
+                    if (isCurrent(root)) {
+                        setter.accept(value);
+                        syncSelection.run();
+                        onChanged.run();
+                    }
+                });
+            }
+        }
+        syncSelection.run();
     }
 
     private void confirmDeleteFavorite(View vocabulary, List<FavoriteDao.Row> allRows, FavoriteDao.Row target,
@@ -2033,7 +2552,7 @@ public final class MainActivity extends Activity {
                                 allRows.remove(target);
                                 ListView listView = vocabulary.findViewById(R.id.vocabulary_list);
                                 if (listView.getAdapter() instanceof FavoritesAdapter adapter) {
-                                    adapter.filter(vocabularyQuery);
+                                    adapter.filter(vocabularyQuery, vocabLevelFilter, vocabSourceFilter, vocabMasteryFilter);
                                     updateVocabularyStats(summaryStats, allRows);
                                     start.setEnabled(!allRows.isEmpty());
                                     if (allRows.isEmpty()) {
@@ -2076,9 +2595,9 @@ public final class MainActivity extends Activity {
         summaryStats.setText("共 " + total + " 词 · 待复习 " + due + " · 已掌握 " + mastered);
     }
 
-    private void startPractice(ArticleOwner owner, List<FavoriteDao.Row> rows, ReadingArticle fromReader) {
-        Runnable backToVocabulary = () -> showVocabulary(fromReader);
-        View loading = showClozeScreen(R.layout.screen_status, backToVocabulary);
+    private void startPractice(ArticleOwner owner, List<FavoriteDao.Row> rows) {
+        nav.push(NavEntry.of(NavEntry.Screen.CLOZE));
+        View loading = showClozeScreen(R.layout.screen_status, this::navigateBack);
         loading.<TextView>findViewById(R.id.status_message).setText(R.string.cloze_loading);
         ReadingArticle builtIn = example();
         List<Favorite> favorites = new ArrayList<>(rows.size());
@@ -2104,22 +2623,34 @@ public final class MainActivity extends Activity {
                 runOnUiThread(() -> {
                     if (isCurrent(loading)) {
                         if (creation.round() == null) {
-                            showPracticeError(loading, R.string.cloze_bad_source, backToVocabulary);
+                            showPracticeError(loading, R.string.cloze_bad_source, this::navigateBack);
                         } else {
-                            practice = new Practice(creation.round(), fromReader);
-                            showPractice();
+                            practice = new Practice(creation.round(), null);
+                            renderPractice();
                         }
                     }
                 });
             } catch (RuntimeException failure) {
-                runOnUiThread(() -> showPracticeError(loading, R.string.cloze_load_error, backToVocabulary));
+                runOnUiThread(() -> showPracticeError(loading, R.string.cloze_load_error, this::navigateBack));
             }
         });
     }
 
     private void showPractice() {
+        NavEntry top = nav.top();
+        if (top == null || top.screen != NavEntry.Screen.CLOZE) {
+            nav.push(NavEntry.of(NavEntry.Screen.CLOZE));
+        }
+        renderPractice();
+    }
+
+    private void renderPractice() {
         Practice current = practice;
-        new ClozeScreen(this, current.round(), () -> showVocabulary(current.fromReader())).show();
+        if (current == null) {
+            navigateBack();
+            return;
+        }
+        new ClozeScreen(this, current.round(), this::navigateBack).show();
     }
 
     private void showPracticeError(View loading, int message, Runnable backToVocabulary) {
@@ -2146,17 +2677,22 @@ public final class MainActivity extends Activity {
             this.filteredRows.addAll(allRows);
         }
 
-        void filter(String query) {
+        void filter(String query, String levelFilter, String sourceFilter, String masteryFilter) {
             filteredRows.clear();
             String normalized = query == null ? "" : ReadingArticle.trimSpace(query).toLowerCase(Locale.ROOT);
-            if (normalized.isEmpty()) {
-                filteredRows.addAll(allRows);
-            } else {
-                for (FavoriteDao.Row entry : allRows) {
-                    Favorite fav = entry.favorite;
-                    String title = DemoArticle.ID.equals(fav.articleId)
-                            ? getString(R.string.article_title) : (entry.articleTitle == null ? "" : entry.articleTitle);
+            for (FavoriteDao.Row entry : allRows) {
+                Favorite fav = entry.favorite;
+                if (!matchesLevel(fav, levelFilter)
+                        || !matchesSource(fav, sourceFilter)
+                        || !matchesMastery(fav, masteryFilter)) {
+                    continue;
+                }
+                if (normalized.isEmpty()) {
+                    filteredRows.add(entry);
+                } else {
+                    String title = resolveArticleTitle(entry);
                     if (containsIgnoreCase(fav.selection, normalized)
+                            || containsIgnoreCase(fav.lemma, normalized)
                             || containsIgnoreCase(fav.meaning, normalized)
                             || containsIgnoreCase(fav.sentence, normalized)
                             || containsIgnoreCase(title, normalized)) {
@@ -2165,6 +2701,51 @@ public final class MainActivity extends Activity {
                 }
             }
             notifyDataSetChanged();
+        }
+
+        private boolean matchesLevel(Favorite fav, String levelFilter) {
+            if (levelFilter == null || levelFilter.isEmpty()) {
+                return true;
+            }
+            return levelFilter.equalsIgnoreCase(fav.cetLevel);
+        }
+
+        private boolean matchesSource(Favorite fav, String sourceFilter) {
+            if (sourceFilter == null || sourceFilter.isEmpty()) {
+                return true;
+            }
+            boolean isDict = Favorite.DICT_ARTICLE_ID.equals(fav.articleId)
+                    || Favorite.SOURCE_DICTIONARY.equals(fav.sourceType);
+            if (Favorite.SOURCE_DICTIONARY.equals(sourceFilter)) {
+                return isDict;
+            }
+            if (Favorite.SOURCE_READER.equals(sourceFilter)) {
+                return !isDict;
+            }
+            return true;
+        }
+
+        private boolean matchesMastery(Favorite fav, String masteryFilter) {
+            if (masteryFilter == null || masteryFilter.isEmpty()) {
+                return true;
+            }
+            return switch (masteryFilter) {
+                case "new" -> fav.masteryLevel <= 0;
+                case "learning" -> fav.masteryLevel == 1 || fav.masteryLevel == 2;
+                case "mastered" -> fav.masteryLevel >= 3;
+                default -> true;
+            };
+        }
+
+        private String resolveArticleTitle(FavoriteDao.Row entry) {
+            Favorite fav = entry.favorite;
+            if (Favorite.DICT_ARTICLE_ID.equals(fav.articleId)) {
+                return "词典查词";
+            }
+            if (DemoArticle.ID.equals(fav.articleId)) {
+                return getString(R.string.article_title);
+            }
+            return entry.articleTitle == null ? "" : entry.articleTitle;
         }
 
         private boolean containsIgnoreCase(String text, String needle) {
@@ -2192,18 +2773,31 @@ public final class MainActivity extends Activity {
                     ? getLayoutInflater().inflate(R.layout.row_favorite, parent, false) : convertView;
             FavoriteDao.Row entry = getItem(position);
             Favorite favorite = entry.favorite;
+            boolean isDict = Favorite.DICT_ARTICLE_ID.equals(favorite.articleId);
             row.<TextView>findViewById(R.id.favorite_term).setText(favorite.selection);
             row.<TextView>findViewById(R.id.favorite_meaning).setText(favorite.meaning);
             row.<TextView>findViewById(R.id.favorite_sentence).setText(favorite.sentence);
-            String articleTitle = DemoArticle.ID.equals(favorite.articleId)
-                    ? getString(R.string.article_title) : entry.articleTitle;
-            setMessage(row.findViewById(R.id.favorite_article), articleTitle);
+            String articleTitle = resolveArticleTitle(entry);
+            setMessage(row.findViewById(R.id.favorite_article), articleTitle.isEmpty() ? null : articleTitle);
 
             TextView phoneticView = UiViews.findOptionalView(row, "favorite_row_phonetic", TextView.class);
             if (phoneticView != null) {
                 String meta = formatFavoriteMeta(favorite);
                 phoneticView.setText(meta);
                 phoneticView.setVisibility(meta.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+
+            TextView levelView = row.findViewById(R.id.favorite_level);
+            if (levelView != null) {
+                String levelText = favorite.cetLevel == null ? "" : favorite.cetLevel;
+                levelView.setText(levelText);
+                levelView.setVisibility(levelText.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+
+            TextView sourceView = row.findViewById(R.id.favorite_source);
+            if (sourceView != null) {
+                sourceView.setText(isDict || Favorite.SOURCE_DICTIONARY.equals(favorite.sourceType) ? "词典" : "阅读");
+                sourceView.setVisibility(View.VISIBLE);
             }
 
             TextView masteryView = UiViews.findOptionalView(row, "favorite_row_mastery", TextView.class);
@@ -2221,8 +2815,14 @@ public final class MainActivity extends Activity {
                 return true;
             });
 
-            row.findViewById(R.id.favorite_jump)
-                    .setOnClickListener(v -> openArticle(vocabulary, favorite.articleId, favorite));
+            TextView jumpButton = row.findViewById(R.id.favorite_jump);
+            if (isDict) {
+                jumpButton.setText("词典详情");
+                jumpButton.setOnClickListener(v -> openDictionary(favorite.selection));
+            } else {
+                jumpButton.setText(R.string.return_to_article);
+                jumpButton.setOnClickListener(v -> openArticle(vocabulary, favorite.articleId, favorite));
+            }
             return row;
         }
     }

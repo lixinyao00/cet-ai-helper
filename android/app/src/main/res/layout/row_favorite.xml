@@ -21,11 +21,27 @@
             android:textSize="22sp" />
 
         <TextView
+            android:id="@+id/favorite_level"
+            style="@style/StudyBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/favorite_source"
+            style="@style/StudyBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:visibility="gone" />
+
+        <TextView
             android:id="@+id/favorite_row_mastery"
             style="@style/StudyBadge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
+            android:layout_marginStart="6dp"
             android:visibility="gone" />
     </LinearLayout>
 

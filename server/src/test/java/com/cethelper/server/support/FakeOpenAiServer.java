@@ -66,6 +66,11 @@ public final class FakeOpenAiServer implements AutoCloseable {
     /** 上游正文里的诱饵密钥：任何响应体都不应出现该字符串。 */
     public static final String LEAK_MARKER = "sk-UPSTREAM-SECRET-should-never-leak";
 
+    /** 流式请求返回的固定答复，供 AI 助教 live 测试断言 delta 拼接结果。 */
+    public static final String STREAM_REPLY = "这是本地假上游返回的流式答复。";
+
+    private static final String STREAM_MODEL = "fake-model";
+
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final HttpServer server;
@@ -74,6 +79,7 @@ public final class FakeOpenAiServer implements AutoCloseable {
     private volatile long slowMillis = 1500;
     private volatile String lastRequestBody = "";
     private volatile String lastAuthorization = "";
+    private volatile String lastRequestPath = "";
     /** 非空时直接用这段文本作为 content，用于在用例里临时构造任意返回内容。 */
     private volatile String customContent;
     private final AtomicInteger requestCount = new AtomicInteger();
@@ -126,6 +132,10 @@ public final class FakeOpenAiServer implements AutoCloseable {
         return lastAuthorization;
     }
 
+    public String lastRequestPath() {
+        return lastRequestPath;
+    }
+
     public int requestCount() {
         return requestCount.get();
     }
@@ -133,7 +143,9 @@ public final class FakeOpenAiServer implements AutoCloseable {
     private void handle(HttpExchange exchange) throws IOException {
         lastRequestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
         lastAuthorization = exchange.getRequestHeaders().getFirst("Authorization");
+        lastRequestPath = exchange.getRequestURI().getPath();
         requestCount.incrementAndGet();
+        boolean streaming = wantsStreaming(lastRequestBody);
 
         Mode current = mode;
         try {
@@ -142,6 +154,11 @@ public final class FakeOpenAiServer implements AutoCloseable {
             }
             if (current == Mode.ERROR) {
                 write(exchange, 500, "{\"error\":{\"message\":\"" + LEAK_MARKER + "\",\"type\":\"server_error\"}}");
+                return;
+            }
+            if (streaming) {
+                String custom = customContent;
+                writeStream(exchange, custom != null ? custom : STREAM_REPLY);
                 return;
             }
             if (current == Mode.GARBAGE) {
@@ -163,6 +180,56 @@ public final class FakeOpenAiServer implements AutoCloseable {
         } catch (IOException e) {
             // 客户端超时断开时写响应会失败，属于预期情况。
         }
+    }
+
+    /** 请求体里 {@code "stream":true} 时走 OpenAI SSE 流式响应。 */
+    private static boolean wantsStreaming(String requestBody) {
+        if (requestBody == null || requestBody.isBlank()) {
+            return false;
+        }
+        try {
+            return MAPPER.readTree(requestBody).path("stream").asBoolean(false);
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    /** 按 OpenAI Chat Completions 的 SSE 格式分块返回 content，最后以 [DONE] 结束。 */
+    private static void writeStream(HttpExchange exchange, String reply) throws IOException {
+        exchange.getResponseHeaders().set("Content-Type", "text/event-stream; charset=utf-8");
+        exchange.getResponseHeaders().set("Cache-Control", "no-cache");
+        exchange.sendResponseHeaders(200, 0);
+        try (OutputStream out = exchange.getResponseBody()) {
+            for (String piece : split(reply, 6)) {
+                Map<String, Object> delta = new LinkedHashMap<>();
+                delta.put("content", piece);
+                Map<String, Object> choice = new LinkedHashMap<>();
+                choice.put("index", 0);
+                choice.put("delta", delta);
+                choice.put("finish_reason", null);
+                Map<String, Object> chunk = new LinkedHashMap<>();
+                chunk.put("id", "chatcmpl-fake-stream");
+                chunk.put("object", "chat.completion.chunk");
+                chunk.put("model", STREAM_MODEL);
+                chunk.put("choices", List.of(choice));
+                out.write(("data: " + MAPPER.writeValueAsString(chunk) + "\n\n")
+                        .getBytes(StandardCharsets.UTF_8));
+                out.flush();
+            }
+            out.write("data: [DONE]\n\n".getBytes(StandardCharsets.UTF_8));
+            out.flush();
+        }
+    }
+
+    private static List<String> split(String text, int size) {
+        List<String> pieces = new ArrayList<>();
+        int index = 0;
+        while (index < text.length()) {
+            int end = Math.min(text.length(), index + size);
+            pieces.add(text.substring(index, end));
+            index = end;
+        }
+        return pieces;
     }
 
     private static boolean isSentenceMode(Mode mode) {

@@ -260,6 +260,15 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
                 android:text="@string/writing_edit_essay" />
+
+            <Button
+                android:id="@+id/writing_ask_tutor"
+                style="@style/StudySecondaryButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/ask_tutor"
+                android:visibility="gone" />
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

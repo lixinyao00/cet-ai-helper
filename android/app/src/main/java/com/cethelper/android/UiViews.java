@@ -58,4 +58,26 @@ final class UiViews {
     static String formatTranslationWordCount(int words) {
         return "当前 " + words + " 词";
     }
+
+    static String safeText(String text) {
+        return text == null ? "" : text;
+    }
+
+    static String truncate(String text, int maxLength) {
+        if (text == null) {
+            return "";
+        }
+        String trimmed = text.trim();
+        if (trimmed.length() <= maxLength) {
+            return trimmed;
+        }
+        return maxLength <= 1 ? trimmed.substring(0, Math.max(0, maxLength))
+                : trimmed.substring(0, maxLength - 1) + "…";
+    }
+
+    static void setVisible(View view, boolean visible) {
+        if (view != null) {
+            view.setVisibility(visible ? View.VISIBLE : View.GONE);
+        }
+    }
 }

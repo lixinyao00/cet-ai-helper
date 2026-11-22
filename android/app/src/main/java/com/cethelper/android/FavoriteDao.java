@@ -51,4 +51,12 @@ interface FavoriteDao {
     @Query("SELECT COUNT(*) FROM favorites WHERE serverUrl = :serverUrl AND studentId = :studentId "
             + "AND next_review_at <= :now")
     int countDue(String serverUrl, long studentId, long now);
+
+    @Query("SELECT * FROM favorites WHERE serverUrl = :serverUrl AND studentId = :studentId "
+            + "AND articleId = '" + Favorite.DICT_ARTICLE_ID + "' AND LOWER(selection) = LOWER(:selection) LIMIT 1")
+    Favorite findDictionary(String serverUrl, long studentId, String selection);
+
+    @Query("DELETE FROM favorites WHERE serverUrl = :serverUrl AND studentId = :studentId "
+            + "AND articleId = '" + Favorite.DICT_ARTICLE_ID + "' AND LOWER(selection) = LOWER(:selection)")
+    void deleteDictionary(String serverUrl, long studentId, String selection);
 }

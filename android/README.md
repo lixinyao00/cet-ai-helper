@@ -340,3 +340,26 @@ python3 android/qa/draft_process_qa.py
 构建产物：[Debug APK](app/build/outputs/apk/debug/app-debug.apk)，SHA-256 `aecbcf0f5d3051e45e9d196e5b439065669e3d262bd3302c71cb5c7926567879`。
 
 以下项目没有本轮实际证据，不能视为已通过：物理 Android 手机上的厂商相机、系统选择器、进程回收与输入法差异；真实模型（live）下的提示、批改和写作质量；Android 8–14 及非 Pixel 分辨率的设备。真实模型需在有授权的 `CET_MODEL_*` 配置下验证，物理手机由用户本人验收。
+
+## 0.9.0 查词、AI 助教与多级返回栈
+
+本版新增三块能力：
+
+- **独立查词**：底部「查词」页支持前缀联想（全部 / CET-4 / CET-6）、词条卡（音标、词性、级别、释义、用法、双语例句与 TTS 朗读）、查词历史、加入生词本，以及「追问 AI 助教」。查询调用服务端 `/api/v1/dictionary/suggest` 与 `/api/v1/dictionary/lookup`；历史与词典收藏按账号保存在本机。
+- **AI 助教**：底部「AI 助教」页为自由问答；阅读查词卡、句法分析面板、翻译批改页和写作批改页均提供追问入口，携带当前上下文打开助教。消息通过 `/api/v1/tutor/chat/stream` 以 SSE 流式返回，界面按 `delta` 增量显示，支持停止生成、清空会话和点击 `followUps` 继续追问；对话同步写入本机数据库。
+- **Room v4 与多级返回栈**：`StudyDatabase` 升级到 version 4，新增 `dictionary_history`、`tutor_messages` 两张表，`favorites` 增加 `lemma` / `cet_level` / `source_type`，并提供 `MIGRATION_3_4`。`MainActivity` 使用首页 / 查词 / AI 助教 / 生词本四栏底栏（L1，仅根页面显示）与 `NavigationStack` 管理 L2/L3 压栈；从生词本回原文、练习与练习来源之间返回时保留筛选和进度，翻译/写作页面在压栈期间不释放草稿状态。
+
+### 构建与回归
+
+本机离线构建环境与 0.8.0 相同，SDK 与 Gradle 缓存放在 `android/.local/`：
+
+```sh
+cd android
+export JAVA_HOME="$HOME/cet-tools/amazon-corretto-21.jdk/Contents/Home"
+export ANDROID_HOME="$PWD/.local/sdk"
+export GRADLE_USER_HOME="$PWD/.local/gradle"
+export ANDROID_USER_HOME="$PWD/.local/android-user"
+./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest --offline
+```
+
+合并后的实际结果：`:app:testDebugUnitTest` 33 项全部通过（0 失败 / 0 错误），`:app:assembleDebug`、`:app:assembleDebugAndroidTest` 成功，`:app:lintDebug` 0 个错误、41 个警告。产物为 `app/build/outputs/apk/debug/app-debug.apk` 与 `app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk`。本轮执行环境没有在线模拟器或真机，因此 `ClozeRecreationTest`、`TranslationPracticeTest`、`WritingPracticeTest`、`SentenceAnalysisPanelTest`、`StudyDatabaseMigrationTest` 尚未运行 instrumentation；连接设备后可用 `./gradlew :app:connectedDebugAndroidTest`（或安装两个 APK 后 `am instrument`）补验。

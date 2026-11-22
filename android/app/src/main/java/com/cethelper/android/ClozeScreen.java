@@ -139,11 +139,22 @@ final class ClozeScreen {
         page.<TextView>findViewById(R.id.cloze_answer).setText(favorite.selection);
         page.<TextView>findViewById(R.id.cloze_meaning).setText(favorite.meaning);
         page.<TextView>findViewById(R.id.cloze_original).setText(favorite.sentence);
-        page.findViewById(R.id.cloze_jump).setOnClickListener(v -> {
-            if (host.isCurrent(page)) {
-                host.showReader(question.article(), favorite, this::show);
-            }
-        });
+        TextView jump = page.findViewById(R.id.cloze_jump);
+        if (Favorite.DICT_ARTICLE_ID.equals(favorite.articleId)) {
+            jump.setText("词典详情");
+            jump.setOnClickListener(v -> {
+                if (host.isCurrent(page)) {
+                    host.openDictionary(favorite.selection);
+                }
+            });
+        } else {
+            jump.setText(R.string.return_to_article);
+            jump.setOnClickListener(v -> {
+                if (host.isCurrent(page)) {
+                    host.showReader(question.article(), favorite, this::show);
+                }
+            });
+        }
         TextView next = page.findViewById(R.id.cloze_next);
         next.setText(round.number() == round.total() ? R.string.cloze_finish : R.string.cloze_next);
         next.setOnClickListener(v -> {

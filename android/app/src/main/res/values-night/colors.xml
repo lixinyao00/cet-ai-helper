@@ -19,4 +19,6 @@
     <color name="badge_bg">#1D3A37</color>
     <color name="badge_text">#80CBC4</color>
     <color name="ripple">#334DB6AC</color>
+    <color name="nav_divider">#26363A</color>
+    <color name="bubble_assistant_bg">#182427</color>
 </resources>

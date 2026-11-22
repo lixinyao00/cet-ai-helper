@@ -185,6 +185,40 @@ public final class ApiTestSupport {
         return mvc.perform(request.content(rawJson));
     }
 
+    /** GET /api/v1/dictionary/suggest；level 为 null 时不带该参数。 */
+    public static ResultActions dictionarySuggest(MockMvc mvc, String token, String query,
+                                                 String level, Integer limit) throws Exception {
+        var request = get("/api/v1/dictionary/suggest");
+        if (query != null) {
+            request = request.param("q", query);
+        }
+        if (level != null) {
+            request = request.param("level", level);
+        }
+        if (limit != null) {
+            request = request.param("limit", String.valueOf(limit));
+        }
+        if (token != null) {
+            request = request.header("Authorization", "Bearer " + token);
+        }
+        return mvc.perform(request);
+    }
+
+    /** POST /api/v1/dictionary/lookup。 */
+    public static ResultActions dictionaryLookup(MockMvc mvc, String token, String word) throws Exception {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("word", word);
+        return dictionaryLookupRaw(mvc, token, json(payload));
+    }
+
+    public static ResultActions dictionaryLookupRaw(MockMvc mvc, String token, String rawJson) throws Exception {
+        var request = post("/api/v1/dictionary/lookup").contentType(MediaType.APPLICATION_JSON);
+        if (token != null) {
+            request = request.header("Authorization", "Bearer " + token);
+        }
+        return mvc.perform(request.content(rawJson));
+    }
+
     /** 登录并取出 accessToken。 */
     public static String accessToken(MockMvc mvc, String username, String password) throws Exception {
         MvcResult result = login(mvc, username, password).andExpect(status().isOk()).andReturn();

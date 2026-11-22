@@ -9,6 +9,7 @@ public class CetProperties {
 
     private final Auth auth = new Auth();
     private final Explanation explanation = new Explanation();
+    private final Article article = new Article();
 
     public Auth getAuth() {
         return auth;
@@ -16,6 +17,10 @@ public class CetProperties {
 
     public Explanation getExplanation() {
         return explanation;
+    }
+
+    public Article getArticle() {
+        return article;
     }
 
     /** 账号与会话配置。 */
@@ -90,6 +95,21 @@ public class CetProperties {
         public void setConnectTimeout(Duration connectTimeout) {
             this.connectTimeout = connectTimeout;
         }
+
+        public Duration getReadTimeout() {
+            return readTimeout;
+        }
+
+        public void setReadTimeout(Duration readTimeout) {
+            this.readTimeout = readTimeout;
+        }
+    }
+
+    /** 文章整理配置：OCR 长文本或图片提取通常比普通释义耗时更久。 */
+    public static class Article {
+
+        /** 文章整理单次上游读超时。 */
+        private Duration readTimeout = Duration.ofSeconds(45);
 
         public Duration getReadTimeout() {
             return readTimeout;

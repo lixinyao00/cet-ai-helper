@@ -4,9 +4,11 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.SocketException;
@@ -14,17 +16,26 @@ import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.net.URI;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.StringJoiner;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BooleanSupplier;
 
 final class ApiClient {
     record Student(long id, String username) {}
 
     record Health(String status, String mode, String version) {}
+
+    record OrganizedArticle(String title, String body, String summary, String mode) {}
 
     record Explanation(String meaning, String detail, String mode,
                        String phonetic, String partOfSpeech, String lemma,
@@ -69,6 +80,22 @@ final class ApiClient {
         ConnectionFailure(IOException cause) {
             super(cause);
         }
+    }
+
+    interface StreamHandle {
+        void cancel();
+
+        boolean isCancelled();
+    }
+
+    interface TutorStreamListener {
+        void onMeta(String mode, String contextType);
+
+        void onDelta(String text);
+
+        void onDone(List<String> followUps);
+
+        void onError(Exception failure);
     }
 
     private final String baseUrl;
@@ -127,6 +154,493 @@ final class ApiClient {
 
     void logout(String token) throws IOException, JSONException, Failure {
         request("POST", "/auth/logout", token, null);
+    }
+
+    List<DictionarySuggestion> dictionarySuggest(String token, String query, String level, int limit)
+            throws IOException, JSONException, Failure {
+        StringBuilder path = new StringBuilder("/dictionary/suggest?q=");
+        path.append(URLEncoder.encode(query == null ? "" : query, StandardCharsets.UTF_8.name()));
+        if (level != null && !ReadingArticle.trimSpace(level).isEmpty()) {
+            path.append("&level=").append(
+                    URLEncoder.encode(ReadingArticle.trimSpace(level), StandardCharsets.UTF_8.name()));
+        }
+        path.append("&limit=").append(limit);
+        JSONArray array = requestArray("GET", path.toString(), token);
+        List<DictionarySuggestion> items = new ArrayList<>(array.length());
+        for (int i = 0; i < array.length(); i++) {
+            items.add(DictionarySuggestion.fromJson(array.getJSONObject(i)));
+        }
+        return items;
+    }
+
+    DictionaryEntry dictionaryLookup(String token, String word)
+            throws IOException, JSONException, Failure {
+        JSONObject payload = new JSONObject().put("word", word);
+        JSONObject body = request("POST", "/dictionary/lookup", token, payload);
+        return DictionaryEntry.fromJson(body);
+    }
+
+    OrganizedArticle organizeArticle(String token, String rawText, String imageBase64,
+                                     String imageMimeType, String target)
+            throws IOException, JSONException, Failure {
+        JSONObject payload = new JSONObject();
+        if (rawText != null && !ReadingArticle.trimSpace(rawText).isEmpty()) {
+            payload.put("rawText", rawText);
+        }
+        if (imageBase64 != null && !imageBase64.isEmpty()) {
+            payload.put("imageBase64", imageBase64);
+            if (imageMimeType != null && !ReadingArticle.trimSpace(imageMimeType).isEmpty()) {
+                payload.put("imageMimeType", ReadingArticle.trimSpace(imageMimeType));
+            }
+        }
+        if (target != null && !ReadingArticle.trimSpace(target).isEmpty()) {
+            payload.put("target", ReadingArticle.trimSpace(target));
+        }
+        JSONObject res = request("POST", "/articles/organize", token, payload, 45000);
+        String body = requiredText(res, "body");
+        return new OrganizedArticle(
+                optClean(res, "title"),
+                body,
+                optClean(res, "summary"),
+                optClean(res, "mode"));
+    }
+
+    StreamHandle streamTutorChat(String token, JSONArray messages, TutorContext context,
+                                 ExecutorService executor, TutorStreamListener listener) {
+        AtomicBoolean cancelled = new AtomicBoolean(false);
+        AtomicReference<HttpURLConnection> connectionRef = new AtomicReference<>();
+        AtomicReference<BufferedReader> readerRef = new AtomicReference<>();
+
+        StreamHandle handle = new StreamHandle() {
+            @Override
+            public void cancel() {
+                if (cancelled.compareAndSet(false, true)) {
+                    BufferedReader reader = readerRef.getAndSet(null);
+                    if (reader != null) {
+                        try {
+                            reader.close();
+                        } catch (IOException ignored) {
+                            // Stream teardown on cancel.
+                        }
+                    }
+                    HttpURLConnection connection = connectionRef.getAndSet(null);
+                    if (connection != null) {
+                        connection.disconnect();
+                    }
+                }
+            }
+
+            @Override
+            public boolean isCancelled() {
+                return cancelled.get();
+            }
+        };
+
+        executor.execute(() -> {
+            if (cancelled.get()) {
+                return;
+            }
+            HttpURLConnection connection = null;
+            BufferedReader reader = null;
+            try {
+                JSONObject payload = new JSONObject();
+                payload.put("messages", messages == null ? new JSONArray() : messages);
+                payload.put("context", (context == null ? TutorContext.free() : context).toJson());
+                byte[] data = payload.toString().getBytes(StandardCharsets.UTF_8);
+
+                connection = (HttpURLConnection)
+                        new URL(baseUrl + "/api/v1/tutor/chat/stream").openConnection();
+                connectionRef.set(connection);
+                if (cancelled.get()) {
+                    return;
+                }
+                connection.setRequestMethod("POST");
+                connection.setInstanceFollowRedirects(false);
+                connection.setConnectTimeout(6000);
+                connection.setReadTimeout(60000);
+                connection.setRequestProperty("Accept", "text/event-stream");
+                connection.setRequestProperty("Cache-Control", "no-cache");
+                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                if (token != null) {
+                    connection.setRequestProperty("Authorization", "Bearer " + token);
+                }
+                connection.setDoOutput(true);
+                connection.setFixedLengthStreamingMode(data.length);
+                try (OutputStream output = connection.getOutputStream()) {
+                    output.write(data);
+                }
+                if (cancelled.get()) {
+                    return;
+                }
+                int status = connection.getResponseCode();
+                if (cancelled.get()) {
+                    return;
+                }
+                if (status == -1) {
+                    listener.onError(new IOException("Missing HTTP response status"));
+                    return;
+                }
+                if (status < 200 || status >= 300) {
+                    JSONObject error = new JSONObject();
+                    try {
+                        error = readJson(connection.getErrorStream());
+                    } catch (IOException | JSONException ignored) {
+                        // Preserve HTTP status when error body is missing or malformed.
+                    }
+                    if (!cancelled.get()) {
+                        listener.onError(new Failure(status, error.optString("code"),
+                                error.optString("message", "服务请求失败（HTTP " + status + "）。")));
+                    }
+                    return;
+                }
+                reader = new BufferedReader(new InputStreamReader(
+                        connection.getInputStream(), StandardCharsets.UTF_8));
+                readerRef.set(reader);
+                if (cancelled.get()) {
+                    return;
+                }
+                parseTutorSseStream(reader, cancelled::get, listener);
+            } catch (Exception failure) {
+                if (!cancelled.get()) {
+                    listener.onError(failure);
+                }
+            } finally {
+                BufferedReader activeReader = readerRef.getAndSet(null);
+                if (activeReader != null) {
+                    try {
+                        activeReader.close();
+                    } catch (IOException ignored) {
+                        // Ignore close errors.
+                    }
+                } else if (reader != null) {
+                    try {
+                        reader.close();
+                    } catch (IOException ignored) {
+                        // Ignore close errors.
+                    }
+                }
+                HttpURLConnection activeConnection = connectionRef.getAndSet(null);
+                if (activeConnection != null) {
+                    activeConnection.disconnect();
+                } else if (connection != null) {
+                    connection.disconnect();
+                }
+            }
+        });
+
+        return handle;
+    }
+
+    static void parseTutorSseStream(BufferedReader reader, BooleanSupplier isCancelled,
+                                    TutorStreamListener listener) throws IOException {
+        String currentEvent = null;
+        StringBuilder dataBuffer = new StringBuilder();
+        boolean terminated = false;
+        String line;
+        while ((line = reader.readLine()) != null) {
+            if (isCancelled.getAsBoolean()) {
+                return;
+            }
+            if (line.isEmpty()) {
+                if (currentEvent != null || dataBuffer.length() > 0) {
+                    String ev = currentEvent;
+                    String payload = dataBuffer.toString();
+                    currentEvent = null;
+                    dataBuffer.setLength(0);
+                    if (dispatchSseEvent(ev, payload, isCancelled, listener)) {
+                        terminated = true;
+                        break;
+                    }
+                }
+                continue;
+            }
+            if (line.startsWith(":")) {
+                continue;
+            }
+            if (line.startsWith("event:")) {
+                currentEvent = line.substring(6).trim();
+            } else if (line.startsWith("data:")) {
+                String value = (line.length() > 5 && line.charAt(5) == ' ')
+                        ? line.substring(6)
+                        : line.substring(5);
+                if (dataBuffer.length() > 0) {
+                    dataBuffer.append('\n');
+                }
+                dataBuffer.append(value);
+            }
+        }
+        if (!terminated && !isCancelled.getAsBoolean()
+                && (currentEvent != null || dataBuffer.length() > 0)) {
+            terminated = dispatchSseEvent(currentEvent, dataBuffer.toString(), isCancelled, listener);
+        }
+        if (!terminated && !isCancelled.getAsBoolean()) {
+            listener.onError(new IOException("stream closed"));
+        }
+    }
+
+    private static boolean dispatchSseEvent(String eventName, String data,
+                                            BooleanSupplier isCancelled,
+                                            TutorStreamListener listener) {
+        if (isCancelled.getAsBoolean()) {
+            return true;
+        }
+        String ev = eventName == null ? "" : eventName.trim();
+        try {
+            switch (ev) {
+                case "meta" -> {
+                    Map<String, Object> obj = SseJson.parseObject(data);
+                    if (!isCancelled.getAsBoolean()) {
+                        listener.onMeta(SseJson.optClean(obj, "mode"), SseJson.optClean(obj, "contextType"));
+                    }
+                    return false;
+                }
+                case "delta" -> {
+                    Map<String, Object> obj = SseJson.parseObject(data);
+                    String text = SseJson.optString(obj, "text", "");
+                    if (!text.isEmpty() && !isCancelled.getAsBoolean()) {
+                        listener.onDelta(text);
+                    }
+                    return false;
+                }
+                case "done" -> {
+                    List<String> followUps = new ArrayList<>();
+                    if (!data.isEmpty()) {
+                        Map<String, Object> obj = SseJson.parseObject(data);
+                        Object rawList = obj.get("followUps");
+                        if (rawList instanceof List<?> items) {
+                            for (Object entry : items) {
+                                if (entry instanceof String item && !ReadingArticle.trimSpace(item).isEmpty()) {
+                                    followUps.add(item);
+                                }
+                            }
+                        }
+                    }
+                    if (!isCancelled.getAsBoolean()) {
+                        listener.onDone(Collections.unmodifiableList(followUps));
+                    }
+                    return true;
+                }
+                case "error" -> {
+                    Map<String, Object> obj = data.isEmpty()
+                            ? Collections.emptyMap()
+                            : SseJson.parseObject(data);
+                    String code = SseJson.optClean(obj, "code");
+                    String message = SseJson.optString(obj, "message", "AI 助教暂时不可用，请稍后再试。");
+                    if (!isCancelled.getAsBoolean()) {
+                        listener.onError(new Failure(200, code, message));
+                    }
+                    return true;
+                }
+                default -> {
+                    return false;
+                }
+            }
+        } catch (IOException invalidPayload) {
+            if (!isCancelled.getAsBoolean()) {
+                listener.onError(invalidPayload);
+            }
+            return true;
+        }
+    }
+
+    /**
+     * Minimal RFC 8259 JSON parser for SSE event payloads so parsing works identically on
+     * Android runtime and pure JVM unit tests without android.jar org.json stubs.
+     */
+    private static final class SseJson {
+        private final String src;
+        private int pos;
+
+        private SseJson(String src) {
+            this.src = src == null ? "" : src;
+        }
+
+        static Map<String, Object> parseObject(String raw) throws IOException {
+            SseJson parser = new SseJson(raw);
+            parser.skipWs();
+            Object value = parser.readValue();
+            parser.skipWs();
+            if (parser.pos != parser.src.length() || !(value instanceof Map<?, ?>)) {
+                throw new IOException("Invalid SSE JSON object");
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> result = (Map<String, Object>) value;
+            return result;
+        }
+
+        static String optString(Map<String, Object> obj, String key, String fallback) {
+            Object raw = obj.get(key);
+            return raw instanceof String s ? s : fallback;
+        }
+
+        static String optClean(Map<String, Object> obj, String key) {
+            Object raw = obj.get(key);
+            return raw instanceof String s ? ReadingArticle.trimSpace(s) : "";
+        }
+
+        private Object readValue() throws IOException {
+            skipWs();
+            if (pos >= src.length()) {
+                throw new IOException("Unexpected end of JSON");
+            }
+            char c = src.charAt(pos);
+            return switch (c) {
+                case '{' -> readObject();
+                case '[' -> readArray();
+                case '"' -> readString();
+                case 't' -> readLiteral("true", Boolean.TRUE);
+                case 'f' -> readLiteral("false", Boolean.FALSE);
+                case 'n' -> readLiteral("null", null);
+                default -> {
+                    if (c == '-' || (c >= '0' && c <= '9')) {
+                        yield readNumber();
+                    }
+                    throw new IOException("Unexpected token in JSON at " + pos);
+                }
+            };
+        }
+
+        private Map<String, Object> readObject() throws IOException {
+            pos++; // '{'
+            Map<String, Object> map = new LinkedHashMap<>();
+            skipWs();
+            if (peek('}')) {
+                pos++;
+                return map;
+            }
+            while (true) {
+                skipWs();
+                if (!peek('"')) {
+                    throw new IOException("Expected string key at " + pos);
+                }
+                String key = readString();
+                skipWs();
+                expect(':');
+                Object value = readValue();
+                map.put(key, value);
+                skipWs();
+                if (peek(',')) {
+                    pos++;
+                } else if (peek('}')) {
+                    pos++;
+                    return map;
+                } else {
+                    throw new IOException("Expected ',' or '}' at " + pos);
+                }
+            }
+        }
+
+        private List<Object> readArray() throws IOException {
+            pos++; // '['
+            List<Object> list = new ArrayList<>();
+            skipWs();
+            if (peek(']')) {
+                pos++;
+                return list;
+            }
+            while (true) {
+                list.add(readValue());
+                skipWs();
+                if (peek(',')) {
+                    pos++;
+                } else if (peek(']')) {
+                    pos++;
+                    return list;
+                } else {
+                    throw new IOException("Expected ',' or ']' at " + pos);
+                }
+            }
+        }
+
+        private String readString() throws IOException {
+            expect('"');
+            StringBuilder sb = new StringBuilder();
+            while (pos < src.length()) {
+                char c = src.charAt(pos++);
+                if (c == '"') {
+                    return sb.toString();
+                }
+                if (c == '\\') {
+                    if (pos >= src.length()) {
+                        throw new IOException("Unterminated escape");
+                    }
+                    char esc = src.charAt(pos++);
+                    switch (esc) {
+                        case '"', '\\', '/' -> sb.append(esc);
+                        case 'b' -> sb.append('\b');
+                        case 'f' -> sb.append('\f');
+                        case 'n' -> sb.append('\n');
+                        case 'r' -> sb.append('\r');
+                        case 't' -> sb.append('\t');
+                        case 'u' -> {
+                            if (pos + 4 > src.length()) {
+                                throw new IOException("Invalid unicode escape");
+                            }
+                            String hex = src.substring(pos, pos + 4);
+                            pos += 4;
+                            try {
+                                sb.append((char) Integer.parseInt(hex, 16));
+                            } catch (NumberFormatException e) {
+                                throw new IOException("Invalid unicode escape: " + hex);
+                            }
+                        }
+                        default -> throw new IOException("Invalid escape: \\" + esc);
+                    }
+                } else {
+                    sb.append(c);
+                }
+            }
+            throw new IOException("Unterminated JSON string");
+        }
+
+        private Object readLiteral(String literal, Object value) throws IOException {
+            if (!src.startsWith(literal, pos)) {
+                throw new IOException("Expected " + literal + " at " + pos);
+            }
+            pos += literal.length();
+            return value;
+        }
+
+        private Double readNumber() throws IOException {
+            int start = pos;
+            if (peek('-')) {
+                pos++;
+            }
+            while (pos < src.length() && isNumberChar(src.charAt(pos))) {
+                pos++;
+            }
+            try {
+                return Double.valueOf(src.substring(start, pos));
+            } catch (NumberFormatException e) {
+                throw new IOException("Invalid JSON number at " + start);
+            }
+        }
+
+        private static boolean isNumberChar(char c) {
+            return (c >= '0' && c <= '9') || c == '.' || c == 'e' || c == 'E' || c == '+' || c == '-';
+        }
+
+        private void skipWs() {
+            while (pos < src.length()) {
+                char c = src.charAt(pos);
+                if (c == ' ' || c == '\t' || c == '\r' || c == '\n') {
+                    pos++;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        private boolean peek(char expected) {
+            return pos < src.length() && src.charAt(pos) == expected;
+        }
+
+        private void expect(char expected) throws IOException {
+            if (!peek(expected)) {
+                throw new IOException("Expected '" + expected + "' at " + pos);
+            }
+            pos++;
+        }
     }
 
     Explanation explain(String token, String selection, String sentence)
@@ -404,14 +918,14 @@ final class ApiClient {
         };
     }
 
-    private static String requiredText(JSONObject object, String key) throws JSONException {
+    static String requiredText(JSONObject object, String key) throws JSONException {
         if (object.get(key) instanceof String text && !ReadingArticle.trimSpace(text).isEmpty()) {
             return text;
         }
         throw new JSONException("Missing text: " + key);
     }
 
-    private static String optClean(JSONObject object, String key) {
+    static String optClean(JSONObject object, String key) {
         if (!object.has(key) || object.isNull(key)) {
             return "";
         }
@@ -440,13 +954,30 @@ final class ApiClient {
 
     private JSONObject request(String method, String path, String token, JSONObject payload)
             throws IOException, JSONException, Failure {
+        return request(method, path, token, payload, 30000);
+    }
+
+    private JSONObject request(String method, String path, String token, JSONObject payload, int readTimeoutMs)
+            throws IOException, JSONException, Failure {
+        String text = requestRaw(method, path, token, payload, readTimeoutMs);
+        return text.isEmpty() ? new JSONObject() : new JSONObject(text);
+    }
+
+    private JSONArray requestArray(String method, String path, String token)
+            throws IOException, JSONException, Failure {
+        String text = requestRaw(method, path, token, null, 30000);
+        return text.isEmpty() ? new JSONArray() : new JSONArray(text);
+    }
+
+    private String requestRaw(String method, String path, String token, JSONObject payload, int readTimeoutMs)
+            throws IOException, JSONException, Failure {
         HttpURLConnection connection = (HttpURLConnection)
                 new URL(baseUrl + "/api/v1" + path).openConnection();
         try {
             connection.setRequestMethod(method);
             connection.setInstanceFollowRedirects(false);
             connection.setConnectTimeout(6000);
-            connection.setReadTimeout(30000);
+            connection.setReadTimeout(readTimeoutMs);
             connection.setRequestProperty("Accept", "application/json");
             if (token != null) {
                 connection.setRequestProperty("Authorization", "Bearer " + token);
@@ -473,7 +1004,7 @@ final class ApiClient {
                 throw new IOException("Missing HTTP response status");
             }
             if (status == HttpURLConnection.HTTP_NO_CONTENT) {
-                return new JSONObject();
+                return "";
             }
             if (status < 200 || status >= 300) {
                 JSONObject error = new JSONObject();
@@ -485,15 +1016,20 @@ final class ApiClient {
                 throw new Failure(status, error.optString("code"),
                         error.optString("message", "服务请求失败（HTTP " + status + "）。"));
             }
-            return readJson(connection.getInputStream());
+            return readText(connection.getInputStream());
         } finally {
             connection.disconnect();
         }
     }
 
     private static JSONObject readJson(InputStream stream) throws IOException, JSONException {
+        String text = readText(stream);
+        return text.isEmpty() ? new JSONObject() : new JSONObject(text);
+    }
+
+    private static String readText(InputStream stream) throws IOException {
         if (stream == null) {
-            return new JSONObject();
+            return "";
         }
         try (InputStream input = stream; ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[4096];
@@ -501,7 +1037,7 @@ final class ApiClient {
             while ((read = input.read(buffer)) != -1) {
                 output.write(buffer, 0, read);
             }
-            return new JSONObject(output.toString(StandardCharsets.UTF_8.name()));
+            return output.toString(StandardCharsets.UTF_8.name());
         }
     }
 }

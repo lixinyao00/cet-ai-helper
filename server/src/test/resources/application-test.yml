@@ -9,6 +9,10 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: create-drop
+  # 与生产配置保持一致：只用 Spring AI 库、不做自动装配。
+  ai:
+    model:
+      chat: none
 
 cet:
   auth:

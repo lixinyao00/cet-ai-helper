@@ -298,9 +298,11 @@ final class TranslationScreen {
         TextView scoreBand = UiViews.findOptionalView(page, "translation_score_band", TextView.class);
         View refCard = UiViews.findOptionalView(page, "translation_reference_card");
         TextView refText = UiViews.findOptionalView(page, "translation_reference_text", TextView.class);
+        View askTutor = UiViews.findOptionalView(page, "translation_ask_tutor");
 
         if (result == null && !pending && error == null) {
             reviewPanel.setVisibility(View.GONE);
+            UiViews.setVisible(askTutor, false);
             if (scoreCard != null) {
                 scoreCard.setVisibility(View.GONE);
             }
@@ -316,6 +318,7 @@ final class TranslationScreen {
         reviewHeading.setText(result != null && result.demo()
                 ? R.string.review_demo : R.string.translation_review_heading);
         if (pending) {
+            UiViews.setVisible(askTutor, false);
             if (scoreCard != null) {
                 scoreCard.setVisibility(View.GONE);
             }
@@ -324,6 +327,7 @@ final class TranslationScreen {
             }
             reviewStatus.setText(R.string.translation_review_loading);
         } else if (error != null) {
+            UiViews.setVisible(askTutor, false);
             if (scoreCard != null) {
                 scoreCard.setVisibility(View.GONE);
             }
@@ -392,7 +396,48 @@ final class TranslationScreen {
             for (TranslationFeedback.Issue issue : result.issues()) {
                 addIssue(result, issue);
             }
+            if (askTutor != null) {
+                askTutor.setVisibility(View.VISIBLE);
+                askTutor.setOnClickListener(v -> openTutor(result));
+            }
         }
+    }
+
+    private void openTutor(TranslationFeedback.Review result) {
+        StringBuilder note = new StringBuilder();
+        if (result.estimatedScore() >= 0) {
+            note.append("预估分：").append(result.estimatedScore())
+                    .append("/").append(result.scoreMax()).append("分");
+            if (!result.scoreBand().isEmpty()) {
+                note.append("（").append(result.scoreBand()).append("）");
+            }
+            note.append("\n");
+        }
+        if (result.overall() != null && !result.overall().isEmpty()) {
+            note.append("总评：").append(result.overall()).append("\n");
+        }
+        if (result.referenceTranslation() != null && !result.referenceTranslation().isEmpty()) {
+            note.append("参考译文：").append(result.referenceTranslation()).append("\n");
+        }
+        for (TranslationFeedback.Issue issue : result.issues()) {
+            note.append("- ").append(host.getString(issue.type().label))
+                    .append("「").append(UiViews.safeText(issue.quote())).append("」：")
+                    .append(UiViews.safeText(issue.detail()));
+            if (issue.suggestion() != null && !issue.suggestion().isEmpty()) {
+                note.append(" 建议：").append(issue.suggestion());
+            }
+            note.append("\n");
+        }
+        String draftText = ReadingArticle.trimSpace(exercise.draft);
+        if (draftText.isEmpty()) {
+            draftText = UiViews.safeText(result.submittedDraft());
+        }
+        host.openTutorWithContext(new TutorContext(
+                TutorContext.TRANSLATION,
+                "翻译练习",
+                UiViews.truncate(draftText, 2000),
+                UiViews.truncate(exercise.source, 6000),
+                UiViews.truncate(note.toString(), 4000)));
     }
 
     private void showEditedStatus() {

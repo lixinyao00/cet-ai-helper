@@ -6,7 +6,8 @@ import androidx.room.RoomDatabase;
 import androidx.room.migration.Migration;
 import androidx.sqlite.db.SupportSQLiteDatabase;
 
-@Database(entities = {Favorite.class, ImportedArticle.class, PracticeRecord.class}, version = 3)
+@Database(entities = {Favorite.class, ImportedArticle.class, PracticeRecord.class,
+        DictionaryHistory.class, TutorMessage.class}, version = 4)
 abstract class StudyDatabase extends RoomDatabase {
     static final Migration MIGRATION_1_2 = new Migration(1, 2) {
         @Override
@@ -45,9 +46,53 @@ abstract class StudyDatabase extends RoomDatabase {
         }
     };
 
+    static final Migration MIGRATION_3_4 = new Migration(3, 4) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            database.execSQL("ALTER TABLE `favorites` ADD COLUMN `lemma` TEXT NOT NULL DEFAULT ''");
+            database.execSQL("ALTER TABLE `favorites` ADD COLUMN `cet_level` TEXT NOT NULL DEFAULT ''");
+            database.execSQL("ALTER TABLE `favorites` ADD COLUMN `source_type` TEXT NOT NULL DEFAULT 'reader'");
+
+            database.execSQL("CREATE TABLE IF NOT EXISTS `dictionary_history` ("
+                    + "`server_url` TEXT NOT NULL, "
+                    + "`student_id` INTEGER NOT NULL, "
+                    + "`word` TEXT NOT NULL, "
+                    + "`phonetic` TEXT NOT NULL DEFAULT '', "
+                    + "`part_of_speech` TEXT NOT NULL DEFAULT '', "
+                    + "`lemma` TEXT NOT NULL DEFAULT '', "
+                    + "`cet_level` TEXT NOT NULL DEFAULT '', "
+                    + "`meaning` TEXT NOT NULL, "
+                    + "`explanation` TEXT NOT NULL, "
+                    + "`example_sentence` TEXT NOT NULL DEFAULT '', "
+                    + "`mode` TEXT NOT NULL DEFAULT 'demo', "
+                    + "`looked_up_at` INTEGER NOT NULL, "
+                    + "PRIMARY KEY(`server_url`, `student_id`, `word`))");
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_dictionary_history_server_url_student_id_looked_up_at` "
+                    + "ON `dictionary_history` (`server_url`, `student_id`, `looked_up_at`)");
+
+            database.execSQL("CREATE TABLE IF NOT EXISTS `tutor_messages` ("
+                    + "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, "
+                    + "`server_url` TEXT NOT NULL, "
+                    + "`student_id` INTEGER NOT NULL, "
+                    + "`session_key` TEXT NOT NULL, "
+                    + "`role` TEXT NOT NULL, "
+                    + "`content` TEXT NOT NULL, "
+                    + "`context_type` TEXT NOT NULL DEFAULT '', "
+                    + "`context_summary` TEXT NOT NULL DEFAULT '', "
+                    + "`mode` TEXT NOT NULL DEFAULT '', "
+                    + "`created_at` INTEGER NOT NULL)");
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_tutor_messages_server_url_student_id_session_key_created_at` "
+                    + "ON `tutor_messages` (`server_url`, `student_id`, `session_key`, `created_at`)");
+        }
+    };
+
     abstract FavoriteDao favorites();
 
     abstract ArticleDao articles();
 
     abstract PracticeRecordDao practiceRecords();
+
+    abstract DictionaryHistoryDao dictionaryHistory();
+
+    abstract TutorMessageDao tutorMessages();
 }

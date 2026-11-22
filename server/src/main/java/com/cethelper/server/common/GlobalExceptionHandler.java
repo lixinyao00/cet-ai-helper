@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -28,7 +29,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiError> handleApiException(ApiException ex) {
-        return ResponseEntity.status(ex.getStatus()).body(new ApiError(ex.getCode(), ex.getMessage()));
+        // 显式 application/json：SSE 接口同步校验失败时客户端 Accept 可能是 text/event-stream，
+        // 不指定内容类型会触发 HttpMediaTypeNotAcceptableException，导致错误体无法读取。
+        return ResponseEntity.status(ex.getStatus())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new ApiError(ex.getCode(), ex.getMessage()));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -36,15 +41,18 @@ public class GlobalExceptionHandler {
         // 字段类型不符（例如把字符串字段写成数字或布尔值）单独给一条更明确的说明。
         if (ex.getMostSpecificCause() instanceof MismatchedInputException) {
             return ResponseEntity.badRequest()
+                    .contentType(MediaType.APPLICATION_JSON)
                     .body(new ApiError("INVALID_INPUT", "请求字段类型不正确：字符串字段请使用 JSON 字符串。"));
         }
         return ResponseEntity.badRequest()
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(new ApiError("INVALID_INPUT", "请求体不是合法的 JSON，或字段类型不正确。"));
     }
 
     @ExceptionHandler({MissingServletRequestParameterException.class, MethodArgumentTypeMismatchException.class})
     public ResponseEntity<ApiError> handleBadParameter(Exception ex) {
         return ResponseEntity.badRequest()
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(new ApiError("INVALID_INPUT", "请求参数缺失或格式不正确。"));
     }
 

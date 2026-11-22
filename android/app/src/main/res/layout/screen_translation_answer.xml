@@ -259,6 +259,15 @@
                 android:layout_marginTop="10dp"
                 android:text="@string/translation_edit_draft"
                 android:visibility="gone" />
+
+            <Button
+                android:id="@+id/translation_ask_tutor"
+                style="@style/StudySecondaryButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/ask_tutor"
+                android:visibility="gone" />
         </LinearLayout>
 
         <LinearLayout

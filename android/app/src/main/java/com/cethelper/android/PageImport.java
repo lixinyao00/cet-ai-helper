@@ -9,6 +9,8 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
@@ -16,6 +18,8 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.core.content.FileProvider;
+
+import org.json.JSONException;
 
 import java.io.File;
 import java.io.IOException;
@@ -27,6 +31,8 @@ final class PageImport {
     private static final int CAPTURE_REQUEST = 21;
     private static final int PICK_REQUEST = 22;
     private static final int PREVIEW_MAX_EDGE = 1280;
+    private static final int MAX_TITLE_LENGTH = 120;
+    private static final int MAX_BODY_LENGTH = 50000;
     private static final int CAMERA_GRANT = Intent.FLAG_GRANT_READ_URI_PERMISSION
             | Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
     private static final Pattern ENGLISH_LETTER = Pattern.compile("[A-Za-z]");
@@ -46,10 +52,14 @@ final class PageImport {
     private final ArrayList<String> extraCameraFiles = new ArrayList<>();
     private Uri image;
     private boolean appending;
+    private boolean multiPage;
     private boolean imageCollapsed;
+    private boolean organizing;
+    private int organizeGeneration;
     private String reviewNotice;
     private String title = "";
     private String body = "";
+    private String rawBody = "";
     private String message;
     private EditText titleField;
     private EditText bodyField;
@@ -71,10 +81,12 @@ final class PageImport {
             String savedImage = saved.getString("image");
             image = savedImage == null ? null : Uri.parse(savedImage);
             appending = saved.getBoolean("appending", false);
+            multiPage = saved.getBoolean("multiPage", false);
             imageCollapsed = saved.getBoolean("imageCollapsed", false);
             reviewNotice = saved.getString("reviewNotice");
             title = saved.getString("title", "");
             body = saved.getString("body", "");
+            rawBody = saved.getString("rawBody", "");
             message = saved.getString("message");
         }
     }
@@ -98,10 +110,12 @@ final class PageImport {
         saved.putStringArrayList("extraCameraFiles", new ArrayList<>(extraCameraFiles));
         saved.putString("image", image == null ? null : image.toString());
         saved.putBoolean("appending", appending);
+        saved.putBoolean("multiPage", multiPage);
         saved.putBoolean("imageCollapsed", imageCollapsed);
         saved.putString("reviewNotice", reviewNotice);
         saved.putString("title", stage == Stage.REVIEW && titleField != null ? titleField.getText().toString() : title);
         saved.putString("body", stage == Stage.REVIEW && bodyField != null ? bodyField.getText().toString() : body);
+        saved.putString("rawBody", rawBody);
         saved.putString("message", message);
         return saved;
     }
@@ -136,11 +150,16 @@ final class PageImport {
 
     @SuppressWarnings("deprecation")
     private void launchAppend(boolean camera) {
+        organizeGeneration++;
+        organizing = false;
         if (titleField != null) {
             title = titleField.getText().toString();
         }
         if (bodyField != null) {
             body = bodyField.getText().toString();
+        }
+        if (rawBody.isEmpty() && !body.isEmpty()) {
+            rawBody = body;
         }
         if (cameraFile != null) {
             extraCameraFiles.add(cameraFile);
@@ -231,14 +250,18 @@ final class PageImport {
     }
 
     void reset() {
+        organizeGeneration++;
+        organizing = false;
         clearImage();
         stage = null;
         owner = null;
         appending = false;
+        multiPage = false;
         imageCollapsed = false;
         reviewNotice = null;
         title = "";
         body = "";
+        rawBody = "";
         message = null;
         titleField = null;
         bodyField = null;
@@ -272,7 +295,18 @@ final class PageImport {
         }
     }
 
+    private SessionStore.Session activeSession() {
+        SessionStore.Session account = host.session();
+        if (account == null || account.serverUrl() == null || account.serverUrl().isEmpty()
+                || account.token() == null || account.token().isEmpty()) {
+            return null;
+        }
+        return account;
+    }
+
     private void recognize() {
+        int generation = ++organizeGeneration;
+        organizing = false;
         if (image == null) {
             handleRecognizeError("没有收到图片，请重拍或重选。");
             return;
@@ -280,7 +314,7 @@ final class PageImport {
         boolean chinese = target == Target.TRANSLATION;
         View progress = showStatus(chinese ? "正在本机识别中文文字…" : "正在本机识别英文文字…", false);
         PageOcr.recognize(app, image, chinese, result -> {
-            if (!host.isCurrent(progress)) {
+            if (!host.isCurrent(progress) || generation != organizeGeneration) {
                 return;
             }
             if (result == null) {
@@ -289,20 +323,88 @@ final class PageImport {
                     code -> Character.UnicodeScript.of(code) == Character.UnicodeScript.HAN)
                     : !ENGLISH_LETTER.matcher(result).find()) {
                 handleRecognizeError(chinese ? "未识别到中文文字，请重拍或重选。" : "未识别到英文文字，请重拍或重选。");
-            } else if ((appending ? body.length() + 2 : 0) + result.length() > 50000) {
+            } else if ((appending ? body.length() + 2 : 0) + result.length() > MAX_BODY_LENGTH) {
                 handleRecognizeError("识别结果总长度超过限制，请缩小拍摄范围或分篇保存。");
-            } else {
-                if (appending) {
-                    body = body.isEmpty() ? result : body + "\n\n" + result;
-                    reviewNotice = "已追加新的一页识别内容。";
-                    appending = false;
-                } else {
-                    body = result;
-                    reviewNotice = null;
-                }
+            } else if (appending) {
+                body = body.isEmpty() ? result : body + "\n\n" + result;
+                rawBody = rawBody.isEmpty() ? body : rawBody + "\n\n" + result;
+                multiPage = true;
+                reviewNotice = "已追加新的一页识别内容。";
+                appending = false;
                 // Retain the temporary image until the user saves or cancels the import flow.
                 stage = Stage.REVIEW;
                 showEditor();
+            } else {
+                rawBody = result;
+                body = result;
+                reviewNotice = null;
+                SessionStore.Session account = activeSession();
+                if (account == null) {
+                    stage = Stage.REVIEW;
+                    showEditor();
+                    return;
+                }
+                organizeAfterRecognize(progress, account, generation);
+            }
+        });
+    }
+
+    private void organizeAfterRecognize(View progress, SessionStore.Session account, int generation) {
+        organizing = true;
+        TextView messageView = progress.findViewById(R.id.import_message);
+        if (messageView != null) {
+            messageView.setText(R.string.import_organizing);
+        }
+        Uri imageUri = image;
+        String capturedRaw = rawBody;
+        String targetName = target == Target.TRANSLATION ? "translation" : "reading";
+
+        app.practiceRequests.execute(() -> {
+            String imageBase64 = null;
+            String imageMimeType = null;
+            if (imageUri != null) {
+                try {
+                    imageBase64 = PageOcr.encodeJpegBase64(app.getContentResolver(), imageUri);
+                    imageMimeType = "image/jpeg";
+                } catch (IOException | RuntimeException ignored) {
+                    // Proceed with text-only organization when image cannot be re-read.
+                }
+            }
+            try {
+                ApiClient.OrganizedArticle organized = new ApiClient(account.serverUrl())
+                        .organizeArticle(account.token(), capturedRaw, imageBase64, imageMimeType, targetName);
+                host.runOnUiThread(() -> {
+                    if (!host.isCurrent(progress) || generation != organizeGeneration) {
+                        return;
+                    }
+                    organizing = false;
+                    if (organized.body().length() <= MAX_BODY_LENGTH) {
+                        body = organized.body();
+                        if (target == Target.READING && ReadingArticle.trimSpace(title).isEmpty()
+                                && !organized.title().isEmpty()) {
+                            title = truncateTitle(organized.title());
+                        }
+                        reviewNotice = !organized.summary().isEmpty()
+                                ? organized.summary()
+                                : host.getString(R.string.import_organize_done);
+                    } else {
+                        body = rawBody;
+                        reviewNotice = host.getString(R.string.import_organize_fallback);
+                    }
+                    stage = Stage.REVIEW;
+                    showEditor();
+                });
+            } catch (IOException | JSONException | ApiClient.Failure | RuntimeException failure) {
+                host.runOnUiThread(() -> {
+                    if (!host.isCurrent(progress) || generation != organizeGeneration) {
+                        return;
+                    }
+                    organizing = false;
+                    body = rawBody;
+                    reviewNotice = host.getString(R.string.import_organize_fallback);
+                    stage = Stage.REVIEW;
+                    showEditor();
+                });
             }
         });
     }
@@ -359,10 +461,169 @@ final class PageImport {
             status.setVisibility(View.GONE);
         }
         bindImagePreview(editor);
+        bindOrganizeActions(editor);
         bindAppendActions(editor);
         editor.findViewById(R.id.import_cancel).setOnClickListener(v -> cancel());
         editor.findViewById(R.id.import_confirm).setOnClickListener(v -> confirm(editor));
         return editor;
+    }
+
+    private void bindOrganizeActions(View editor) {
+        View organizeButton = UiViews.findOptionalView(editor, "import_organize");
+        View restoreButton = UiViews.findOptionalView(editor, "import_restore_raw");
+        updateRestoreVisibility(restoreButton, bodyField == null ? body : bodyField.getText().toString());
+        if (bodyField != null && restoreButton != null) {
+            bodyField.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+                @Override
+                public void afterTextChanged(Editable s) {
+                    updateRestoreVisibility(restoreButton, s == null ? "" : s.toString());
+                }
+            });
+        }
+        if (organizeButton != null) {
+            organizeButton.setOnClickListener(v -> runManualOrganize(editor, restoreButton));
+        }
+        if (restoreButton != null) {
+            restoreButton.setOnClickListener(v -> {
+                if (organizing || rawBody.isEmpty() || bodyField == null) {
+                    return;
+                }
+                organizeGeneration++;
+                body = rawBody;
+                bodyField.setText(rawBody);
+                bodyField.setSelection(rawBody.length());
+                reviewNotice = host.getString(R.string.import_restored_raw);
+                showReviewStatus(editor, reviewNotice);
+                updateRestoreVisibility(restoreButton, rawBody);
+            });
+        }
+    }
+
+    private void runManualOrganize(View editor, View restoreButton) {
+        if (organizing) {
+            return;
+        }
+        String currentText = bodyField == null ? body : bodyField.getText().toString();
+        String trimmedCurrent = ReadingArticle.trimSpace(currentText);
+        Uri imageUri = multiPage ? null : image;
+        if (trimmedCurrent.isEmpty() && imageUri == null) {
+            reviewNotice = "请先输入或识别正文后再整理。";
+            showReviewStatus(editor, reviewNotice);
+            return;
+        }
+        SessionStore.Session account = activeSession();
+        if (account == null) {
+            reviewNotice = host.getString(R.string.import_organize_fallback);
+            showReviewStatus(editor, reviewNotice);
+            return;
+        }
+        if (rawBody.isEmpty() && !trimmedCurrent.isEmpty()) {
+            rawBody = currentText;
+        }
+        String textToSend = !trimmedCurrent.isEmpty() ? currentText : rawBody;
+        String targetName = target == Target.TRANSLATION ? "translation" : "reading";
+
+        organizing = true;
+        int generation = ++organizeGeneration;
+        setEditorEnabled(editor, false);
+        View cancelButton = editor.findViewById(R.id.import_cancel);
+        if (cancelButton != null) {
+            cancelButton.setEnabled(true);
+        }
+        showReviewStatus(editor, host.getString(R.string.import_organizing_manual));
+
+        app.practiceRequests.execute(() -> {
+            String imageBase64 = null;
+            String imageMimeType = null;
+            if (imageUri != null) {
+                try {
+                    imageBase64 = PageOcr.encodeJpegBase64(app.getContentResolver(), imageUri);
+                    imageMimeType = "image/jpeg";
+                } catch (IOException | RuntimeException ignored) {
+                    // Fall back to text-only organization when image cannot be read.
+                }
+            }
+            try {
+                ApiClient.OrganizedArticle organized = new ApiClient(account.serverUrl())
+                        .organizeArticle(account.token(), textToSend, imageBase64, imageMimeType, targetName);
+                host.runOnUiThread(() -> {
+                    if (!host.isCurrent(editor) || generation != organizeGeneration) {
+                        return;
+                    }
+                    organizing = false;
+                    setEditorEnabled(editor, true);
+                    if (organized.body().length() <= MAX_BODY_LENGTH) {
+                        body = organized.body();
+                        if (bodyField != null) {
+                            bodyField.setText(body);
+                        }
+                        if (target == Target.READING && titleField != null
+                                && ReadingArticle.trimSpace(titleField.getText().toString()).isEmpty()
+                                && !organized.title().isEmpty()) {
+                            title = truncateTitle(organized.title());
+                            titleField.setText(title);
+                        }
+                        reviewNotice = !organized.summary().isEmpty()
+                                ? organized.summary()
+                                : host.getString(R.string.import_organize_done);
+                    } else {
+                        reviewNotice = "整理结果超出长度限制，已保留当前正文。";
+                    }
+                    showReviewStatus(editor, reviewNotice);
+                    updateRestoreVisibility(restoreButton,
+                            bodyField == null ? body : bodyField.getText().toString());
+                });
+            } catch (IOException | JSONException | ApiClient.Failure | RuntimeException failure) {
+                host.runOnUiThread(() -> {
+                    if (!host.isCurrent(editor) || generation != organizeGeneration) {
+                        return;
+                    }
+                    organizing = false;
+                    setEditorEnabled(editor, true);
+                    reviewNotice = host.getString(R.string.import_organize_fallback);
+                    showReviewStatus(editor, reviewNotice);
+                    updateRestoreVisibility(restoreButton,
+                            bodyField == null ? body : bodyField.getText().toString());
+                });
+            }
+        });
+    }
+
+    private void updateRestoreVisibility(View restoreButton, String currentBody) {
+        if (restoreButton == null) {
+            return;
+        }
+        boolean visible = !rawBody.isEmpty() && !rawBody.equals(currentBody == null ? "" : currentBody);
+        restoreButton.setVisibility(visible ? View.VISIBLE : View.GONE);
+    }
+
+    private void showReviewStatus(View editor, String text) {
+        TextView status = editor.findViewById(R.id.import_review_status);
+        if (status == null) {
+            return;
+        }
+        if (text != null && !text.isEmpty()) {
+            status.setText(text);
+            status.setVisibility(View.VISIBLE);
+        } else {
+            status.setVisibility(View.GONE);
+        }
+    }
+
+    private static String truncateTitle(String value) {
+        if (value == null) {
+            return "";
+        }
+        String trimmed = ReadingArticle.trimSpace(value);
+        return trimmed.length() <= MAX_TITLE_LENGTH
+                ? trimmed
+                : trimmed.substring(0, MAX_TITLE_LENGTH);
     }
 
     private void bindImagePreview(View editor) {
@@ -444,6 +705,10 @@ final class PageImport {
     }
 
     private void confirm(View editor) {
+        if (organizing) {
+            return;
+        }
+        organizeGeneration++;
         String correctedTitle = ReadingArticle.trimSpace(titleField.getText().toString());
         String correctedBody = ReadingArticle.trimSpace(bodyField.getText().toString()
                 .replace("\r\n", "\n").replace('\r', '\n'));
@@ -509,6 +774,14 @@ final class PageImport {
         bodyField.setEnabled(enabled);
         editor.findViewById(R.id.import_confirm).setEnabled(enabled);
         editor.findViewById(R.id.import_cancel).setEnabled(enabled);
+        View organizeButton = UiViews.findOptionalView(editor, "import_organize");
+        if (organizeButton != null) {
+            organizeButton.setEnabled(enabled);
+        }
+        View restoreButton = UiViews.findOptionalView(editor, "import_restore_raw");
+        if (restoreButton != null) {
+            restoreButton.setEnabled(enabled);
+        }
         View appendCamera = UiViews.findOptionalView(editor, "import_review_append_camera");
         if (appendCamera != null) {
             appendCamera.setEnabled(enabled);

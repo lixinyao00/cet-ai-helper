@@ -20,7 +20,9 @@ final class SentenceAnalysisPanel {
     private final View result;
     private final View retry;
     private final LinearLayout fragments;
+    private final View askTutor;
     private Consumer<String> onSpeak;
+    private Consumer<SentenceAnalysis> onAskTutor;
     private String currentSentence = "";
 
     SentenceAnalysisPanel(ScrollView scroll) {
@@ -31,6 +33,7 @@ final class SentenceAnalysisPanel {
         result = scroll.findViewById(R.id.analysis_result);
         retry = scroll.findViewById(R.id.analysis_retry);
         fragments = scroll.findViewById(R.id.analysis_fragments);
+        askTutor = UiViews.findOptionalView(scroll, "analysis_ask_tutor");
         original.setOnClickListener(v -> {
             if (onSpeak != null && !currentSentence.isEmpty()) {
                 onSpeak.accept(currentSentence);
@@ -42,12 +45,20 @@ final class SentenceAnalysisPanel {
         this.onSpeak = onSpeak;
     }
 
+    void setOnAskTutor(Consumer<SentenceAnalysis> onAskTutor) {
+        this.onAskTutor = onAskTutor;
+    }
+
     void loading(String sentence) {
         currentSentence = sentence == null ? "" : sentence;
         original.setText(sentence);
         mode.setVisibility(View.GONE);
         result.setVisibility(View.GONE);
         fragments.removeAllViews();
+        if (askTutor != null && onAskTutor != null) {
+            askTutor.setVisibility(View.GONE);
+            askTutor.setOnClickListener(null);
+        }
         status.setText(R.string.analysis_loading);
         status.setVisibility(View.VISIBLE);
         retry.setVisibility(View.GONE);
@@ -81,6 +92,10 @@ final class SentenceAnalysisPanel {
             row.<TextView>findViewById(R.id.fragment_explanation).setText(chunk.explanation());
             row.setOnClickListener(v -> highlight(analysis.sentence(), fragment));
             fragments.addView(row);
+        }
+        if (askTutor != null && onAskTutor != null) {
+            askTutor.setVisibility(View.VISIBLE);
+            askTutor.setOnClickListener(v -> onAskTutor.accept(analysis));
         }
         result.setVisibility(View.VISIBLE);
     }

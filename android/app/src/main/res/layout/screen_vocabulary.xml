@@ -78,6 +78,125 @@
         android:singleLine="true"
         android:textSize="14sp" />
 
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/vocab_filter_level"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/vocab_level_all"
+                style="@style/StudyChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:text="@string/vocab_filter_all" />
+
+            <TextView
+                android:id="@+id/vocab_level_cet4"
+                style="@style/StudyChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:text="@string/dict_filter_cet4" />
+
+            <TextView
+                android:id="@+id/vocab_level_cet6"
+                style="@style/StudyChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/dict_filter_cet6" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/vocab_filter_source"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/vocab_source_all"
+                style="@style/StudyChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:text="@string/vocab_source_all" />
+
+            <TextView
+                android:id="@+id/vocab_source_reader"
+                style="@style/StudyChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:text="@string/vocab_source_reader" />
+
+            <TextView
+                android:id="@+id/vocab_source_dictionary"
+                style="@style/StudyChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/vocab_source_dictionary" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/vocab_filter_mastery"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/vocab_mastery_all"
+                style="@style/StudyChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:text="@string/vocab_mastery_all" />
+
+            <TextView
+                android:id="@+id/vocab_mastery_new"
+                style="@style/StudyChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:text="@string/vocab_mastery_new" />
+
+            <TextView
+                android:id="@+id/vocab_mastery_learning"
+                style="@style/StudyChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:text="@string/vocab_mastery_learning" />
+
+            <TextView
+                android:id="@+id/vocab_mastery_mastered"
+                style="@style/StudyChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/vocab_mastery_mastered" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
     <TextView
         android:id="@+id/vocabulary_status"
         style="@style/StudyCaption"

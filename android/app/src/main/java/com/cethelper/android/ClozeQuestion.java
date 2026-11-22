@@ -8,7 +8,13 @@ record ClozeQuestion(ReadingArticle article, Favorite favorite, String prompt, S
     private static final String SPACES = "[\\s\\p{Zs}]+";
 
     static ClozeQuestion from(ReadingArticle article, Favorite favorite) {
-        if (article == null || favorite == null || !article.id().equals(favorite.articleId)) {
+        if (favorite == null) {
+            return null;
+        }
+        if (Favorite.DICT_ARTICLE_ID.equals(favorite.articleId)) {
+            return fromDictionaryFavorite(favorite);
+        }
+        if (article == null || !article.id().equals(favorite.articleId)) {
             return null;
         }
 
@@ -41,6 +47,30 @@ record ClozeQuestion(ReadingArticle article, Favorite favorite, String prompt, S
         String prompt = sentence.substring(0, start - sentenceStart)
                 + BLANK + sentence.substring(end - sentenceStart);
         return new ClozeQuestion(article, favorite, prompt, maskTitle(article.title(), favorite.selection));
+    }
+
+    private static ClozeQuestion fromDictionaryFavorite(Favorite favorite) {
+        String sentence = favorite.sentence;
+        String selection = favorite.selection;
+        if (sentence == null || selection == null
+                || ReadingArticle.trimSpace(sentence).isEmpty()
+                || ReadingArticle.trimSpace(selection).isEmpty()) {
+            return null;
+        }
+        int start = favorite.startOffset;
+        int end = favorite.endOffset;
+        if (start < 0 || start >= end || end > sentence.length()
+                || !sentence.substring(start, end).equalsIgnoreCase(selection)) {
+            int idx = Favorite.indexOfIgnoreCase(sentence, selection);
+            if (idx < 0) {
+                return null;
+            }
+            start = idx;
+            end = idx + selection.length();
+        }
+        String prompt = sentence.substring(0, start) + BLANK + sentence.substring(end);
+        ReadingArticle dictArticle = new ReadingArticle(Favorite.DICT_ARTICLE_ID, "词典查词", sentence);
+        return new ClozeQuestion(dictArticle, favorite, prompt, "词典查词");
     }
 
     static String buildHint(String selection) {

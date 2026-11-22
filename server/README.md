@@ -513,6 +513,9 @@ java -cp "$(cat target/migration-classpath.txt)" tools/MigrateH2ToMysql.java \
 | POST | `/api/v1/writing-exercise-attempts` | Bearer | `200` | 判断原练习答案并返回中文反馈 |
 | POST | `/api/v1/writing-retests` | Bearer | `200` | 围绕原问题生成新情境的短写作题 |
 | POST | `/api/v1/writing-retest-attempts` | Bearer | `200` | 判答复测，返回表现、证据和下一步建议 |
+| GET | `/api/v1/dictionary/suggest` | Bearer | `200` | 按前缀联想单词，可按 `level`（CET-4 / CET-6）过滤 |
+| POST | `/api/v1/dictionary/lookup` | Bearer | `200` | 查词：词形还原、双语例句；demo 未收录返回 `422`，live 未收录调用模型兜底 |
+| POST | `/api/v1/tutor/chat/stream` | Bearer | `200` | AI 助教流式对话，`text/event-stream`：`meta` → `delta`×N → `done` / `error` |
 
 ### 6.1 统一错误体与错误码
 
@@ -2109,3 +2112,61 @@ server/src/test/resources/application-test.yml   # 测试专用内存库配置
 | 词表兜底 | 非精调句中查 `decline`、`bookstore`、`the` 等常用词返回 `200`、`contextual=false`，并带 `phonetic`/`partOfSpeech`/`lemma`/`cetLevel`；`students → student`、`closes → close` 能还原原形；词表外生词（如 `quizzacious`）仍 `422 DEMO_UNSUPPORTED`。 |
 | 评分与参考译文 | demo 汉译英：草稿 9、补全稿 12、准确/另一种译法 14，`scoreMax=15`，`scoreBand` 与参考译文非空；demo 写作：草稿 10、修订稿 14。live 模型未返回评分时字段省略（JSON 中不出现），返回时原样透传，均不影响成功响应。 |
 | 兼容性 | 五个释义新增字段与四个批改新增字段全部 `@JsonInclude(NON_NULL)`，未返回时不出现；旧断言「恰好三字段/五字段」的场景已同步更新为契约全字段集合。 |
+
+## 13. 0.9.0 新增接口：查词与 AI 助教 SSE
+
+本节补充独立查词和 AI 助教流式对话。两个接口都需要 `Authorization: Bearer <accessToken>`；demo 模式无需任何模型密钥即可完整体验。
+
+### 13.1 `GET /api/v1/dictionary/suggest`
+
+| 参数 | 规则 |
+|---|---|
+| `q` | 必填，去除首尾空白后转小写；空、超过 40 字符或含 `[a-zA-Z' -]` 之外的字符返回 `400 INVALID_INPUT` |
+| `level` | 可选，`CET-4` / `CET-6`（大小写不敏感）；其它值返回 `400` |
+| `limit` | 默认 10，小于 1 返回 `400`，大于 20 按 20 处理 |
+
+排序依次为：原形前缀匹配、变形词前缀匹配、原形子串匹配，并按原形去重。联想只查本地词表，live 模式也不会调用模型；无命中返回 `[]`。
+
+```sh
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "http://127.0.0.1:8080/api/v1/dictionary/suggest?q=aban&level=CET-6&limit=5"
+# [{"word":"abandon","phonetic":"/əˈbændən/","partOfSpeech":"v.","cetLevel":"CET-6","meaning":"放弃；抛弃"}]
+```
+
+### 13.2 `POST /api/v1/dictionary/lookup`
+
+请求体 `{"word":"abandoned"}`，返回用户输入（规范化后小写）、还原后的 `lemma`、音标、词性、级别、释义、用法说明、`exampleSentence`、`exampleTranslation` 与当前服务端运行模式 `mode`。demo 模式未收录返回 `422 DEMO_UNSUPPORTED`；live 模式先查本地词表，未命中才调用模型，模型异常映射为 `502 MODEL_ERROR` / `504 MODEL_TIMEOUT`。
+
+```sh
+curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"word":"abandoned"}' http://127.0.0.1:8080/api/v1/dictionary/lookup
+# {"word":"abandoned","lemma":"abandon","phonetic":"/əˈbændən/","partOfSpeech":"v.","cetLevel":"CET-6",
+#  "meaning":"放弃；抛弃","explanation":"...","exampleSentence":"They had to abandon the car in the snow.",
+#  "exampleTranslation":"他们不得不把车丢在雪地里。","mode":"demo"}
+```
+
+### 13.3 `POST /api/v1/tutor/chat/stream`
+
+请求体包含最近对话 `messages`（每条 `role` 为 `user` / `assistant`，最后一条必须是 `user`）和可缺省的 `context`（`type` 为 `FREE` / `WORD` / `SENTENCE` / `TRANSLATION` / `WRITING`）。响应为 `text/event-stream`，严格按以下顺序推送：
+
+```
+event:meta
+data:{"mode":"demo","contextType":"WORD"}
+
+event:delta
+data:{"text":"我们先看 abandon"}
+
+event:done
+data:{"followUps":["能再给我两个例句吗？","它的名词形式怎么用？"]}
+```
+
+`delta.text` 为增量文本，客户端需按到达顺序拼接；`done.followUps` 是可直接点击的推荐追问。生成失败时推送单条 `event:error`，`data` 为 `{"code":"MODEL_ERROR"|"MODEL_TIMEOUT","message":"..."}`，HTTP 状态仍为 `200`。请求校验失败（如空消息、最后一条不是 `user`、上下文超长）在建立流之前返回 `400 INVALID_INPUT` JSON。
+
+```sh
+curl -N -H "Authorization: Bearer $TOKEN" -H "Accept: text/event-stream" \
+  -H "Content-Type: application/json" \
+  -d '{"messages":[{"role":"user","content":"abandon 怎么用？"}],"context":{"type":"WORD","focusText":"abandon"}}' \
+  http://127.0.0.1:8080/api/v1/tutor/chat/stream
+```
+
+demo 模式按预设答复分块推送，live 模式由 Spring AI `ChatClient` 流式生成；`context` 会作为系统提示的一部分传给模型，因此 Android 端可以从查词、句法分析、翻译和写作页面携带原页面内容追问。

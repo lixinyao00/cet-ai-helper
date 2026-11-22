@@ -49,7 +49,9 @@ final class ClozeRound {
                 skipped++;
                 continue;
             }
-            ReadingArticle article = articleLookup.apply(favorite.articleId);
+            ReadingArticle article = Favorite.DICT_ARTICLE_ID.equals(favorite.articleId)
+                    ? null
+                    : articleLookup.apply(favorite.articleId);
             ClozeQuestion question = ClozeQuestion.from(article, favorite);
             if (question == null) {
                 skipped++;
@@ -195,15 +197,18 @@ final class ClozeRound {
         Bundle saved = new Bundle();
         int size = questions.size();
         ArrayList<String> articleIds = new ArrayList<>(size);
+        ArrayList<String> selections = new ArrayList<>(size);
         int[] starts = new int[size];
         int[] ends = new int[size];
         for (int i = 0; i < size; i++) {
             Favorite fav = questions.get(i).favorite();
             articleIds.add(fav.articleId);
+            selections.add(fav.selection);
             starts[i] = fav.startOffset;
             ends[i] = fav.endOffset;
         }
         saved.putStringArrayList("articleIds", articleIds);
+        saved.putStringArrayList("selections", selections);
         saved.putIntArray("starts", starts);
         saved.putIntArray("ends", ends);
         saved.putInt("index", index);
@@ -225,6 +230,7 @@ final class ClozeRound {
             return null;
         }
         ArrayList<String> articleIds = saved.getStringArrayList("articleIds");
+        ArrayList<String> selections = saved.getStringArrayList("selections");
         int[] starts = saved.getIntArray("starts");
         int[] ends = saved.getIntArray("ends");
         if (articleIds == null || starts == null || ends == null
@@ -234,11 +240,13 @@ final class ClozeRound {
         List<ClozeQuestion> restoredQuestions = new ArrayList<>(articleIds.size());
         for (int i = 0; i < articleIds.size(); i++) {
             String articleId = articleIds.get(i);
+            String selection = (selections != null && i < selections.size()) ? selections.get(i) : null;
             int start = starts[i];
             int end = ends[i];
             Favorite match = null;
             for (Favorite fav : allFavorites) {
-                if (fav.articleId.equals(articleId) && fav.startOffset == start && fav.endOffset == end) {
+                if (fav.articleId.equals(articleId) && fav.startOffset == start && fav.endOffset == end
+                        && (selection == null || fav.selection.equals(selection))) {
                     match = fav;
                     break;
                 }
@@ -246,7 +254,10 @@ final class ClozeRound {
             if (match == null) {
                 continue;
             }
-            ClozeQuestion q = ClozeQuestion.from(articleLookup.apply(articleId), match);
+            ReadingArticle article = Favorite.DICT_ARTICLE_ID.equals(articleId)
+                    ? null
+                    : articleLookup.apply(articleId);
+            ClozeQuestion q = ClozeQuestion.from(article, match);
             if (q != null) {
                 restoredQuestions.add(q);
             }

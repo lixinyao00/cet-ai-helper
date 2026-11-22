@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Bottom navigation -->
+    <item type="id" name="bottom_nav" />
+    <item type="id" name="nav_home" />
+    <item type="id" name="nav_dictionary" />
+    <item type="id" name="nav_tutor" />
+    <item type="id" name="nav_vocabulary" />
+
+    <!-- Shared L2 top bar -->
+    <item type="id" name="top_bar_back" />
+    <item type="id" name="top_bar_title" />
+    <item type="id" name="top_bar_action" />
+
+    <!-- Dictionary screen -->
+    <item type="id" name="dict_search_input" />
+    <item type="id" name="dict_search_clear" />
+    <item type="id" name="dict_level_filter" />
+    <item type="id" name="dict_level_all" />
+    <item type="id" name="dict_level_cet4" />
+    <item type="id" name="dict_level_cet6" />
+    <item type="id" name="dict_suggestions" />
+    <item type="id" name="suggest_word" />
+    <item type="id" name="suggest_phonetic" />
+    <item type="id" name="suggest_meaning" />
+    <item type="id" name="suggest_level" />
+    <item type="id" name="dict_history_title" />
+    <item type="id" name="dict_history_chips" />
+    <item type="id" name="dict_history_clear" />
+    <item type="id" name="dict_status" />
+    <item type="id" name="dict_entry_card" />
+    <item type="id" name="dict_word" />
+    <item type="id" name="dict_phonetic" />
+    <item type="id" name="dict_speak" />
+    <item type="id" name="dict_pos" />
+    <item type="id" name="dict_level" />
+    <item type="id" name="dict_meaning" />
+    <item type="id" name="dict_explanation" />
+    <item type="id" name="dict_example" />
+    <item type="id" name="dict_example_translation" />
+    <item type="id" name="dict_favorite" />
+    <item type="id" name="dict_ask_tutor" />
+
+    <!-- AI Tutor screen -->
+    <item type="id" name="tutor_context_card" />
+    <item type="id" name="tutor_context_type" />
+    <item type="id" name="tutor_context_title" />
+    <item type="id" name="tutor_context_summary" />
+    <item type="id" name="tutor_context_clear" />
+    <item type="id" name="tutor_messages" />
+    <item type="id" name="tutor_bubble_text" />
+    <item type="id" name="tutor_bubble_mode" />
+    <item type="id" name="tutor_quick_prompts" />
+    <item type="id" name="tutor_followups" />
+    <item type="id" name="tutor_status" />
+    <item type="id" name="tutor_input" />
+    <item type="id" name="tutor_send" />
+    <item type="id" name="tutor_stop" />
+    <item type="id" name="tutor_clear" />
+
+    <!-- Contextual AI Tutor entry points -->
+    <item type="id" name="reader_ask_tutor" />
+    <item type="id" name="analysis_ask_tutor" />
+    <item type="id" name="translation_ask_tutor" />
+    <item type="id" name="writing_ask_tutor" />
+
+    <!-- Vocabulary filters and row badges -->
+    <item type="id" name="vocab_filter_level" />
+    <item type="id" name="vocab_level_all" />
+    <item type="id" name="vocab_level_cet4" />
+    <item type="id" name="vocab_level_cet6" />
+    <item type="id" name="vocab_filter_source" />
+    <item type="id" name="vocab_source_all" />
+    <item type="id" name="vocab_source_reader" />
+    <item type="id" name="vocab_source_dictionary" />
+    <item type="id" name="vocab_filter_mastery" />
+    <item type="id" name="vocab_mastery_all" />
+    <item type="id" name="vocab_mastery_new" />
+    <item type="id" name="vocab_mastery_learning" />
+    <item type="id" name="vocab_mastery_mastered" />
+    <item type="id" name="favorite_level" />
+    <item type="id" name="favorite_source" />
+
+    <!-- Home additions -->
+    <item type="id" name="home_server_status" />
+    <item type="id" name="home_settings" />
+    <item type="id" name="open_dictionary" />
+    <item type="id" name="open_tutor" />
+</resources>

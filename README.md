@@ -2,6 +2,14 @@
 
 Android 客户端使用 Java、XML Views 和 Room。Spring Boot 服务提供学生账号和在线 AI 能力。阅读材料、生词和练习草稿按账号保存在手机上。
 
+## 0.9.0 新增能力
+
+- **独立查词**：`GET /api/v1/dictionary/suggest` 提供前缀联想（可按 CET-4 / CET-6 过滤），`POST /api/v1/dictionary/lookup` 查询词条并自动还原词形（如 `abandoned` → `abandon`），同时返回音标、词性、释义、用法说明和双语例句。查词记录与词典收藏都按账号保存在手机本地。
+- **AI 助教流式对话**：`POST /api/v1/tutor/chat/stream` 基于 Spring AI（live 模式）与 Servlet `SseEmitter`，按 `meta` → 多条 `delta` → `done`（含 `followUps`）推送 `text/event-stream`。查词、句法分析、翻译批改和写作批改页均可携带上下文「追问 AI 助教」，也能从底部「AI 助教」进入自由问答。
+- **Room v4 与多级返回栈**：数据库升级到 v4（新增 `dictionary_history`、`tutor_messages`，`favorites` 增加 `lemma` / `cet_level` / `source_type`），并提供 3→4 迁移。界面新增首页 / 查词 / AI 助教 / 生词本四栏底栏，使用 `NavigationStack` 管理 L1 Tab 与 L2/L3 页面，返回时保留生词本筛选、练习进度、翻译和写作草稿。
+
+接口字段与错误码详见 [服务端 README](server/README.md)，构建与真机安装详见 [Android README](android/README.md)。
+
 ## 安装 0.8.0 并连接真机
 
 需要 JDK 21、Android SDK（Platform 35 和 Build Tools 35.0.0），以及已开启 USB 调试的 Android 手机。现成的 [0.8.0 Debug APK](android/app/build/outputs/apk/debug/app-debug.apk) 可直接安装。构建步骤见 [Android README](android/README.md)。

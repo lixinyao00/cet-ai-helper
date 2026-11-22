@@ -258,6 +258,9 @@ final class WritingScreen {
         requestStatus.setText(message);
         requestStatus.setVisibility(message == null ? View.GONE : View.VISIBLE);
         retry.setVisibility(error != null && !unsupported ? View.VISIBLE : View.GONE);
+        if (practice.request.pending()) {
+            UiViews.setVisible(UiViews.findOptionalView(page, "writing_ask_tutor"), false);
+        }
         if (displayed != practice.feedback) {
             displayed = practice.feedback;
             if (displayed != null) {
@@ -329,6 +332,50 @@ final class WritingScreen {
             }
             issues.addView(row);
         }
+        View askTutor = UiViews.findOptionalView(page, "writing_ask_tutor");
+        if (askTutor != null) {
+            askTutor.setVisibility(View.VISIBLE);
+            askTutor.setOnClickListener(v -> openTutor(feedback));
+        }
+    }
+
+    private void openTutor(WritingFeedback feedback) {
+        String promptText = ReadingArticle.trimSpace(practice.prompt);
+        if (promptText.isEmpty()) {
+            promptText = UiViews.safeText(feedback.prompt());
+        }
+        String title = promptText.isEmpty() ? "写作练习" : UiViews.truncate(promptText, 40);
+        String essayText = ReadingArticle.trimSpace(practice.essay);
+        if (essayText.isEmpty()) {
+            essayText = UiViews.safeText(feedback.essay());
+        }
+        StringBuilder note = new StringBuilder();
+        if (feedback.estimatedScore() >= 0) {
+            note.append("预估分：").append(feedback.estimatedScore())
+                    .append("/").append(feedback.scoreMax()).append("分");
+            if (!feedback.scoreBand().isEmpty()) {
+                note.append("（").append(feedback.scoreBand()).append("）");
+            }
+            note.append("\n");
+        }
+        if (feedback.overall() != null && !feedback.overall().isEmpty()) {
+            note.append("总评：").append(feedback.overall()).append("\n");
+        }
+        for (WritingFeedback.Issue issue : feedback.issues()) {
+            note.append("- ").append(host.getString(issue.type().label))
+                    .append("「").append(UiViews.safeText(issue.quote())).append("」：")
+                    .append(UiViews.safeText(issue.detail()));
+            if (issue.suggestion() != null && !issue.suggestion().isEmpty()) {
+                note.append(" 建议：").append(issue.suggestion());
+            }
+            note.append("\n");
+        }
+        host.openTutorWithContext(new TutorContext(
+                TutorContext.WRITING,
+                title,
+                UiViews.truncate(essayText, 2000),
+                UiViews.truncate(promptText, 6000),
+                UiViews.truncate(note.toString(), 4000)));
     }
 
     private void scrollTo(View anchor) {
