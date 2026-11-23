@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1")
 public class HealthController {
 
-    /** 与 PLAN.md 契约一致的服务版本号。 */
+    /** 服务接口版本号。 */
     static final String VERSION = "0.2.0";
 
     private final CetProperties properties;

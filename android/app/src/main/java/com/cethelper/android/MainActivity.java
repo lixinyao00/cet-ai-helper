@@ -397,7 +397,7 @@ public final class MainActivity extends Activity {
         }
     }
 
-    // ===== Public Host API (PLAN.md §2.4) =====
+    // ===== Public Host API =====
 
     void navigateBack() {
         if (session == null) {

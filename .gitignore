@@ -20,6 +20,7 @@ server/data/
 
 # ===== IDE / 系统文件 =====
 .idea/
+.vscode/
 *.iml
 .DS_Store
 
@@ -33,3 +34,10 @@ server/data/
 AGENTS.md
 CLAUDE.md
 PLAN.md
+
+# ===== iOS 构建与本地临时 =====
+ios/build/
+ios/DerivedData/
+xcuserdata/
+*.xcuserstate
+ios/ContractStubs/
