@@ -17,6 +17,7 @@ server/data/
 # ===== 环境变量与密钥 =====
 .env
 .env.*
+!.env.example
 
 # ===== IDE / 系统文件 =====
 .idea/

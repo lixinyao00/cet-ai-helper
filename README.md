@@ -1,48 +1,118 @@
-# 四六级 AI 学习助手
+# CetHelper · 四六级 AI 学习助手
 
-Android 客户端使用 Java、XML Views 和 Room；iOS 客户端使用 SwiftUI、Vision 与 SQLite，最低支持 iOS 17。Spring Boot 服务提供学生账号和在线 AI 能力，两端共用同一套接口、demo 数据和错误语义。阅读材料、生词和练习草稿按账号保存在手机上。
+[![CI](https://github.com/lixinyao00/cet-ai-helper/actions/workflows/ci.yml/badge.svg)](https://github.com/lixinyao00/cet-ai-helper/actions/workflows/ci.yml)
+![Java](https://img.shields.io/badge/Java-21-orange)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.16-brightgreen)
+![Android](https://img.shields.io/badge/Android-SDK%2035-3DDC84)
+![iOS](https://img.shields.io/badge/iOS-17%2B%20SwiftUI-007AFF)
 
-- Android：安装、构建与真机验收见下文，或直接打开 [Android README](android/README.md)。
-- iOS：构建、模拟器验收与测试命令见 [iOS README](ios/README.md)。
+一款面向大学英语四六级备考的**端云协同 AI 学习系统**，包含 **Spring Boot 后端服务**、**Android 原生客户端**与 **iOS SwiftUI 客户端**。三端共用同一套 `/api/v1` REST + SSE 接口契约、Demo 内置语料与错误码语义，核心学习数据离线优先保存在端侧本地数据库。
 
-## Android：安装 0.8.0 并连接真机
+---
 
-需要 JDK 21、Android SDK（Platform 35 和 Build Tools 35.0.0），以及已开启 USB 调试的 Android 手机。现成的 [0.8.0 Debug APK](android/app/build/outputs/apk/debug/app-debug.apk) 可直接安装。构建步骤见 [Android README](android/README.md)。
+## 系统架构
 
-先从项目根目录启动本机 demo 后端。保持终端运行。首次构建需要拉取 Maven 依赖，已有构建产物时可跳过打包命令。
+```mermaid
+flowchart LR
+    subgraph Clients["双端客户端（离线优先 · 本地多账号隔离）"]
+        AND["Android 客户端<br/>Java · XML Views · Room v4 · ML Kit OCR"]
+        IOS["iOS 客户端<br/>SwiftUI · MVVM · SQLite v4 · Vision OCR"]
+    end
+
+    subgraph Server["Spring Boot 3.5 服务网关（Java 21 · Spring Security）"]
+        AUTH["认证鉴权<br/>Bearer SHA-256 · H2 / MySQL"]
+        GW["AI 业务代理<br/>释义 / 句法 / OCR整理 / 词典 / 翻译 / 写作"]
+        SSE["AI 助教流式引擎<br/>WebFlux + SseEmitter (SSE)"]
+    end
+
+    subgraph Modes["双模式推理路由"]
+        DEMO["Demo 模式（内置语料，零配置启动）"]
+        LIVE["Live 模式（兼容 OpenAI Chat Completions）"]
+    end
+
+    AND <-->|"HTTPS/HTTP · Bearer + SSE"| AUTH
+    AND <--> GW
+    AND <--> SSE
+    IOS <-->|"URLSession async/await + bytes SSE"| AUTH
+    IOS <--> GW
+    IOS <--> SSE
+    GW --> Modes
+    SSE --> Modes
+```
+
+---
+
+## 核心功能矩阵
+
+| 模块 | 能力说明 | 核心技术 / 接口 |
+| --- | --- | --- |
+| **拍照/相册 OCR 导入** | 拍照或相册选图后端侧识别英文/中文段落，经服务端清理分段后入库 | Android ML Kit / iOS Vision + `POST /api/v1/articles/organize` |
+| **沉浸阅读与语境点词** | 点击单词或长按同句划词查义，自动还原词形并支持一键收藏回原文定位 | `POST /api/v1/explanations` + UTF-16 偏移高亮 |
+| **长难句拆解** | 主干概括 + 按原文顺序拆解从句/短语语法作用 | `POST /api/v1/sentence-analyses` |
+| **独立查词与联想** | 前缀联想（支持 CET-4 / CET-6 过滤）、音标/词性/双语例句与查词历史 | `GET /api/v1/dictionary/suggest`、`POST /api/v1/dictionary/lookup` |
+| **AI 助教（SSE 流式）** | 自由问答 + 从查词/句法/翻译/写作携带上下文追问，增量输出与推荐追问 | `POST /api/v1/tutor/chat/stream`（`meta` → `delta`×N → `done`） |
+| **生词本与原句填空** | 按级别/来源/掌握度三级筛选，结合 SRS 复习间隔生成原句首字母填空 | 本地 SQLite / Room v4 + SRS 调度 |
+| **汉译英与写作复测** | 按关键词/短语/结构分步提示，逐字引用定位批改，写作针对性练习与换题复测 | `POST /api/v1/translation-*`、`POST /api/v1/writing-*` |
+
+---
+
+## 工程与技术亮点
+
+- **Demo / Live 双模式与契约校验**：服务端支持 `demo`（零密钥内置语料）与 `live`（Spring AI + 兼容 OpenAI 协议）无缝切换；对模型输出做严格 JSON 与原文引用校验，异常统一脱敏为稳定错误码（`502 MODEL_ERROR` / `504 MODEL_TIMEOUT`）。
+- **流式 SSE 助教与上下文会话**：后端基于 `Spring WebFlux` 消费上游流并通过 Servlet `SseEmitter` 透传事件流；双端支持中止生成、状态保留与确定性 `sessionKey` 持久化恢复。
+- **端侧多租户隔离与无损迁移**：客户端全部学习数据按 `(serverUrl, studentId)` 复合隔离，切换服务地址或账号互不串库；支持 Room / SQLite `v3 → v4` 无损迁移。
+- **离线续用与跨进程草稿恢复**：断网冷启动自动切换离线只读/复习模式，网络恢复自动通过 `/me` 静默复验；`401` 失效安全退回登录态；写作与翻译草稿跨进程强制停止仍可恢复。
+- **高覆盖自动化测试体系**：服务端 233 项集成/单测（含 `FakeOpenAiServer` 假上游契约回归）+ Android JVM/Instrumentation/跨进程脚本 + iOS 69 项离线单测、真实服务集成测试与浅/深色 XCUITest E2E（配合代理模拟断网与 401）。
+
+---
+
+## 目录结构
+
+```text
+.
+├── server/                 # Spring Boot 3.5 + Java 21 后端服务（H2 / MySQL + Spring AI）
+├── android/                # Android 原生客户端（Java + XML Views + Room v4 + ML Kit）
+├── ios/                    # iOS 原生客户端（SwiftUI + MVVM + SQLite v4 + Vision）
+├── docs/                   # 完整 REST/SSE 接口契约与各端历史验证记录
+├── .github/workflows/      # GitHub Actions CI（Server + Android + iOS）
+└── .env.example            # 环境变量模板（Demo / Live / MySQL）
+```
+
+---
+
+## 快速开始（3 分钟本地体验 Demo 模式）
+
+### 1. 启动后端服务（JDK 21）
 
 ```sh
 cd server
-./mvnw -B package
-java -jar target/cet-server-0.1.0.jar --server.address=127.0.0.1 --server.port=8080 --cet.explanation.mode=demo
+./mvnw -B spring-boot:run
+# 默认监听 http://127.0.0.1:8080，mode=demo（无需模型 API Key）
 ```
 
-另开终端并回到项目根目录。把下列命令中的 `DEVICE_SERIAL` 替换成第一条命令列出的真机序列号。若已有同签名的旧版，`install -r` 会覆盖安装并保留数据。
+> 若需接入真实大模型，参考 [`.env.example`](.env.example) 配置 `CET_EXPLANATION_MODE=live` 与 `CET_MODEL_*` 环境变量；完整说明见 [服务端文档](server/README.md)。
 
-```sh
-adb devices -l
-adb -s DEVICE_SERIAL install -r android/app/build/outputs/apk/debug/app-debug.apk
-adb -s DEVICE_SERIAL reverse tcp:8080 tcp:8080
-```
+### 2. 运行客户端
 
-在 App 登录页的「设置服务端地址」填入 `http://127.0.0.1:8080`，然后注册或登录。如果要在真机上保留旧版的本机数据，请沿用旧版的服务端地址、数据库和学生账号。覆盖安装之后先在线打开一次，让 0.8.0 验证账号并保存离线所需的信息。重新插拔 USB 后可重跑 `adb reverse`。
+- **iOS 模拟器**（macOS + Xcode，推荐直接连接 `http://127.0.0.1:8080`）：
+  ```sh
+  cd ios
+  xcodebuild -project CetHelper.xcodeproj -scheme CetHelper     -destination "platform=iOS Simulator,name=iPhone 17"     -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+  ```
+- **Android 真机 / 模拟器**（JDK 17/21 + Android SDK 35，模拟器默认连接 `http://10.0.2.2:8080`）：
+  ```sh
+  cd android
+  ./gradlew :app:testDebugUnitTest :app:assembleDebug
+  ```
 
-## Android：真机验收
+---
 
-1. **离线回原文。** 在线登录后打开内置示例，查第二处 `decline` 并收藏。断开手机 Wi-Fi 和移动数据，同时拔掉 USB，确保 ADB 转发也中断。到系统的应用信息里点「强行停止」，再打开 App。进入生词本，完成一道填空并点「回原文」，确认高亮的是第二段的 `decline`。
-2. **草稿恢复。** 分别在写作和汉译英里输入自选题目、中文原文和英文草稿。退出练习再进入确认内容仍在。再次强行停止并重开，确认两个模块都能独立继续写。换一个学生账号，确认看不到上一个账号的草稿和收藏。
-3. **真机 OCR。** 连接后端后用手机拍一页纸质英文，从相册另导入一张图。检查校对与分段，确认保存后两篇都能重新打开。
-4. **真实模型。** 按 [服务端 live 启动说明](server/README.md#33-live-模式调用真实模型) 配置模型，将后端切换至 live 模式。用刚拍的英文材料试查词和拆解长句，再用自选题目验证翻译和写作。写作重点核对引文是否来自提交的作文、换题是否仍在考同一个知识点，以及合理的不同答法能否通过。
+## 各端文档与测试
 
-## iOS：0.9.0 构建与模拟器验收
-
-iOS 端与 Android 对齐同一套能力：注册登录、阅读点词与长难句、独立查词与联想、AI 助教 SSE 流式问答、生词本与原句填空、汉译英、写作批改与复测，以及离线续用和草稿恢复。底部四栏（首页 / 查词 / AI 助教 / 生词本）配合多级返回栈，L2/L3 页面保留阅读选区、筛选条件与练习进度。界面用 SwiftUI 实现，图片识别用系统 Vision，数据用 SQLite（v4），服务端地址与 Android 共用 `http://127.0.0.1:8080`。
-
-```sh
-cd ios
-xcodebuild -project CetHelper.xcodeproj -scheme CetHelper \
-  -destination "platform=iOS Simulator,name=iPhone 17" \
-  -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
-```
-
-在 Xcode 27.2 的 iPhone 17 / iOS 27.2 模拟器上已完成全量验收：离线单元测试 57 项、真实 demo 服务集成测试 12 项、XCUITest 端到端 19 项（E1–E20，浅色与深色各一遍），全部通过、0 失败 0 跳过。E12 离线与 E13 401 登出由 `ios/Tools/e2e_proxy.py` 控制代理配合验证。详细命令、逐项结果、截图与已知限制见 [iOS README](ios/README.md)。
+| 文档 | 内容 |
+| --- | --- |
+| [服务端 README](server/README.md) | 后端架构、Demo/Live/MySQL 启动方式、安全设计与测试（233 tests） |
+| [Android README](android/README.md) | 构建安装、真机 USB 联调、Room v4 与离线/草稿机制 |
+| [iOS README](ios/README.md) | Xcode 构建、SQLite v4 架构、单测 / 集成 / XCUITest 全量说明 |
+| [API 契约文档](docs/api-contract.md) | `/api/v1/*` 全部接口入参/出参、错误码表与 `curl` 联调示例 |
+| [测试脚本与验收记录](docs/verification-notes.md) | `live_smoke.py`、`draft_process_qa.py`、`e2e_proxy.py` 及里程碑实测记录 |
